@@ -1,4 +1,3 @@
-# Moi
 #!/bin/bash
 
 # Systeem updaten
