@@ -4,7 +4,6 @@
 TOMCAT_VERSION="9.0.97"
 GUACAMOLE_VERSION="1.5.5"
 MYSQL_PASSWORD="YourStrongPassword"
-GUAC_ADMIN_PASSWORD="Dolfijntjes@112"
 
 # Update system
 sudo apt update
@@ -113,12 +112,11 @@ sudo chown -R tomcat: /etc/guacamole
 sudo chmod -R 755 /etc/guacamole
 
 # Reset MySQL user and set up initial admin account
-# Reset MySQL user and set up initial admin account
 sudo mysql -u guacamole_user -p${MYSQL_PASSWORD} -D guacamole_db -e "
 DELETE FROM guacamole_user WHERE user_id = 1;
 INSERT INTO guacamole_entity (name, type) VALUES ('guacadmin', 'USER');
 INSERT INTO guacamole_user (entity_id, password_hash, password_salt, password_date)
-SELECT entity_id, UNHEX(SHA2(CONCAT('${GUAC_ADMIN_PASSWORD}', HEX(RANDOM_BYTES(32))), 256)), RANDOM_BYTES(32), NOW()
+SELECT entity_id, UNHEX(SHA2(CONCAT('guacadmin', HEX(RANDOM_BYTES(32))), 256)), RANDOM_BYTES(32), NOW()
 FROM guacamole_entity WHERE name = 'guacadmin';"
 # Restart services
 sudo systemctl restart guacd
@@ -129,7 +127,6 @@ sudo ufw allow 22/tcp
 sudo ufw --force enable
 
 echo "Guacamole installation complete."
-echo "Guacamole installation complete."
 echo "Visit: http://<SERVER_IP>:8080/guacamole/"
-echo "Default Login: guacadmin / ${GUAC_ADMIN_PASSWORD}"
+echo "Default Login: guacadmin / guacadmin"
 echo "Please change the default credentials immediately."
