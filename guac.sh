@@ -1,33 +1,34 @@
 #!/bin/bash
 
-# Variabelen
+# Variables
 TOMCAT_VERSION="9.0.97"
 GUACAMOLE_VERSION="1.5.5"
+MYSQL_PASSWORD="YourStrongPassword"
 
-# Systeem updaten
+# Update system
 sudo apt update
 sudo apt upgrade -y
 
-# Nodige pakketten installeren
+# Install required packages
 sudo apt install -y openjdk-11-jdk wget curl gcc g++ libcairo2-dev libjpeg-turbo8-dev libpng-dev libtool-bin \
     libossp-uuid-dev libavcodec-dev libavutil-dev libswscale-dev freerdp2-dev libpango1.0-dev \
     libssh2-1-dev libvncserver-dev libtelnet-dev libssl-dev libvorbis-dev libwebp-dev make \
-    build-essential libpulse-dev libwebsockets-dev unzip
+    build-essential libpulse-dev libwebsockets-dev unzip mysql-server
 
-# Java checken
-java -version || { echo "Java installatie mislukt."; exit 1; }
+# Java check
+java -version || { echo "Java installation failed."; exit 1; }
 
-# Tomcat gebruiker aanmaken
+# Create tomcat user
 sudo useradd -m -U -d /opt/tomcat -s /bin/false tomcat
 
-# Tomcat downloaden en installeren
+# Install Tomcat
 wget https://downloads.apache.org/tomcat/tomcat-9/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz -P /tmp
 sudo tar -xf /tmp/apache-tomcat-${TOMCAT_VERSION}.tar.gz -C /opt/tomcat/
 sudo ln -s /opt/tomcat/apache-tomcat-${TOMCAT_VERSION} /opt/tomcat/latest
 sudo chown -R tomcat: /opt/tomcat
 sudo chmod +x /opt/tomcat/latest/bin/*.sh
 
-# Tomcat service instellen
+# Tomcat service setup
 cat << EOF | sudo tee /etc/systemd/system/tomcat.service
 [Unit]
 Description=Tomcat 9 servlet container
@@ -57,10 +58,10 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now tomcat
 
-# Firewall openen voor Tomcat
+# Open firewall for Tomcat
 sudo ufw allow 8080/tcp
 
-# Guacamole Server installeren
+# Install Guacamole Server
 wget https://downloads.apache.org/guacamole/${GUACAMOLE_VERSION}/source/guacamole-server-${GUACAMOLE_VERSION}.tar.gz
 tar -xzf guacamole-server-${GUACAMOLE_VERSION}.tar.gz
 cd guacamole-server-${GUACAMOLE_VERSION}
@@ -70,52 +71,62 @@ sudo make install
 sudo ldconfig
 cd ..
 
-# Guacamole Client installeren
+# Install Guacamole Client
 sudo mkdir -p /etc/guacamole
 sudo wget https://downloads.apache.org/guacamole/${GUACAMOLE_VERSION}/binary/guacamole-${GUACAMOLE_VERSION}.war -O /etc/guacamole/guacamole.war
 sudo mkdir -p /opt/tomcat/latest/webapps/guacamole
 sudo unzip /etc/guacamole/guacamole.war -d /opt/tomcat/latest/webapps/guacamole
 
-# Guacamole configureren
-echo "guacd-hostname: localhost
-guacd-port: 4822
-user-mapping: /etc/guacamole/user-mapping.xml
-auth-provider: net.sourceforge.guacamole.net.basic.BasicFileAuthenticationProvider" | sudo tee /etc/guacamole/guacamole.properties
+# Install JDBC extension and MySQL connector
+wget https://downloads.apache.org/guacamole/${GUACAMOLE_VERSION}/binary/guacamole-auth-jdbc-${GUACAMOLE_VERSION}.tar.gz
+tar -xzf guacamole-auth-jdbc-${GUACAMOLE_VERSION}.tar.gz
+sudo cp guacamole-auth-jdbc-${GUACAMOLE_VERSION}/mysql/guacamole-auth-jdbc-mysql-${GUACAMOLE_VERSION}.jar /etc/guacamole/extensions/
 
-# Standaard gebruiker instellen
-echo "<user-mapping>
-    <authorize username=\"guacadmin\" password=\"guacadmin\">
-        <connection name=\"SSH\">
-            <protocol>ssh</protocol>
-            <param name=\"hostname\">localhost</param>
-            <param name=\"port\">22</param>
-        </connection>
-    </authorize>
-</user-mapping>" | sudo tee /etc/guacamole/user-mapping.xml
+wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-8.0.33.tar.gz
+tar -xvf mysql-connector-java-8.0.33.tar.gz
+sudo cp mysql-connector-java-8.0.33/mysql-connector-java-8.0.33.jar /etc/guacamole/lib/
 
-# guacd configureren
-cat << EOF | sudo tee /etc/guacamole/guacd.conf
-[daemon]
-pid_file = /var/run/guacd.pid
+# Configure MySQL database
+sudo mysql --execute="CREATE DATABASE guacamole_db;"
+sudo mysql --execute="CREATE USER 'guacamole_user'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';"
+sudo mysql --execute="GRANT SELECT,INSERT,UPDATE,DELETE ON guacamole_db.* TO 'guacamole_user'@'localhost';"
+sudo mysql --execute="FLUSH PRIVILEGES;"
 
-[server]
-bind_host = 127.0.0.1
-bind_port = 4822
-EOF
+# Import Guacamole schema
+cat guacamole-auth-jdbc-${GUACAMOLE_VERSION}/mysql/schema/*.sql | sudo mysql guacamole_db
 
-# Rechten instellen
-sudo chmod -R 644 /etc/guacamole
+# Configure Guacamole properties
+# Configure Guacamole properties
+echo "mysql-hostname: localhost
+mysql-port: 3306
+mysql-database: guacamole_db
+mysql-username: guacamole_user
+mysql-password: ${MYSQL_PASSWORD}
+guacd-hostname: localhost
+guacd-port: 4822" | sudo tee /etc/guacamole/guacamole.properties
+
+# Adjust permissions
+sudo chmod 644 /etc/guacamole/guacamole.properties
+sudo chown tomcat: /etc/guacamole/guacamole.properties
 sudo chown -R tomcat: /etc/guacamole
+sudo chmod -R 755 /etc/guacamole
 
-# Guacamole starten
+# Reset MySQL user and set up initial admin account
+sudo mysql -u guacamole_user -p${MYSQL_PASSWORD} -D guacamole_db -e "
+DELETE FROM guacamole_user WHERE user_id = 1;
+INSERT INTO guacamole_entity (name, type) VALUES ('guacadmin', 'USER');
+INSERT INTO guacamole_user (entity_id, password_hash, password_salt, password_date)
+SELECT entity_id, UNHEX(SHA2(CONCAT('guacadmin', HEX(RANDOM_BYTES(32))), 256)), RANDOM_BYTES(32), NOW()
+FROM guacamole_entity WHERE name = 'guacadmin';"
+# Restart services
 sudo systemctl restart guacd
 sudo systemctl restart tomcat
 
-# Firewall instellen
+# Open firewall ports
 sudo ufw allow 22/tcp
 sudo ufw --force enable
 
-echo "Guacamole installatie klaar."
-echo "Ga naar: http://<SERVER_IP>:8080/guacamole/"
-echo "Login: guacadmin / guacadmin"
-echo "Verander het wachtwoord meteen ofzo!"
+echo "Guacamole installation complete."
+echo "Visit: http://<SERVER_IP>:8080/guacamole/"
+echo "Default Login: guacadmin / guacadmin"
+echo "Please change the default credentials immediately."
