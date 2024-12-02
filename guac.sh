@@ -1,13 +1,15 @@
 #!/bin/bash
 
+set -e
+
 # Variables
 TOMCAT_VERSION="9.0.97"
 GUACAMOLE_VERSION="1.5.5"
 MYSQL_PASSWORD="YourStrongPassword"
+GUAC_ADMIN_PASSWORD="Dolfijntjes@112"
 
 # Update system
-sudo apt update
-sudo apt upgrade -y
+sudo apt update && sudo apt upgrade -y
 
 # Install required packages
 sudo apt install -y openjdk-11-jdk wget curl gcc g++ libcairo2-dev libjpeg-turbo8-dev libpng-dev libtool-bin \
@@ -16,7 +18,7 @@ sudo apt install -y openjdk-11-jdk wget curl gcc g++ libcairo2-dev libjpeg-turbo
     build-essential libpulse-dev libwebsockets-dev unzip mysql-server
 
 # Java check
-java -version || { echo "Java installation failed."; exit 1; }
+java -version
 
 # Create tomcat user
 sudo useradd -m -U -d /opt/tomcat -s /bin/false tomcat
@@ -80,10 +82,12 @@ sudo unzip /etc/guacamole/guacamole.war -d /opt/tomcat/latest/webapps/guacamole
 # Install JDBC extension and MySQL connector
 wget https://downloads.apache.org/guacamole/${GUACAMOLE_VERSION}/binary/guacamole-auth-jdbc-${GUACAMOLE_VERSION}.tar.gz
 tar -xzf guacamole-auth-jdbc-${GUACAMOLE_VERSION}.tar.gz
+sudo mkdir -p /etc/guacamole/extensions
 sudo cp guacamole-auth-jdbc-${GUACAMOLE_VERSION}/mysql/guacamole-auth-jdbc-mysql-${GUACAMOLE_VERSION}.jar /etc/guacamole/extensions/
 
 wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-8.0.33.tar.gz
 tar -xvf mysql-connector-java-8.0.33.tar.gz
+sudo mkdir -p /etc/guacamole/lib
 sudo cp mysql-connector-java-8.0.33/mysql-connector-java-8.0.33.jar /etc/guacamole/lib/
 
 # Configure MySQL database
@@ -96,7 +100,6 @@ sudo mysql --execute="FLUSH PRIVILEGES;"
 cat guacamole-auth-jdbc-${GUACAMOLE_VERSION}/mysql/schema/*.sql | sudo mysql guacamole_db
 
 # Configure Guacamole properties
-# Configure Guacamole properties
 echo "mysql-hostname: localhost
 mysql-port: 3306
 mysql-database: guacamole_db
@@ -105,19 +108,31 @@ mysql-password: ${MYSQL_PASSWORD}
 guacd-hostname: localhost
 guacd-port: 4822" | sudo tee /etc/guacamole/guacamole.properties
 
+# Configure guacd.conf
+echo "[daemon]
+pid_file = /var/run/guacd.pid
+
+[server]
+bind_host = localhost
+bind_port = 4822" | sudo tee /etc/guacamole/guacd.conf
+
 # Adjust permissions
 sudo chmod 644 /etc/guacamole/guacamole.properties
-sudo chown tomcat: /etc/guacamole/guacamole.properties
+sudo chown tomcat:tomcat /etc/guacamole/guacamole.properties
+sudo chmod 644 /etc/guacamole/guacd.conf
+sudo chown root:root /etc/guacamole/guacd.conf
 sudo chown -R tomcat: /etc/guacamole
 sudo chmod -R 755 /etc/guacamole
+sudo usermod -aG tomcat guacd
 
 # Reset MySQL user and set up initial admin account
 sudo mysql -u guacamole_user -p${MYSQL_PASSWORD} -D guacamole_db -e "
 DELETE FROM guacamole_user WHERE user_id = 1;
 INSERT INTO guacamole_entity (name, type) VALUES ('guacadmin', 'USER');
 INSERT INTO guacamole_user (entity_id, password_hash, password_salt, password_date)
-SELECT entity_id, UNHEX(SHA2(CONCAT('guacadmin', HEX(RANDOM_BYTES(32))), 256)), RANDOM_BYTES(32), NOW()
+SELECT entity_id, UNHEX(SHA2(CONCAT('${GUAC_ADMIN_PASSWORD}', HEX(RANDOM_BYTES(32))), 256)), RANDOM_BYTES(32), NOW()
 FROM guacamole_entity WHERE name = 'guacadmin';"
+
 # Restart services
 sudo systemctl restart guacd
 sudo systemctl restart tomcat
@@ -128,5 +143,5 @@ sudo ufw --force enable
 
 echo "Guacamole installation complete."
 echo "Visit: http://<SERVER_IP>:8080/guacamole/"
-echo "Default Login: guacadmin / guacadmin"
+echo "Default Login: guacadmin / ${GUAC_ADMIN_PASSWORD}"
 echo "Please change the default credentials immediately."
