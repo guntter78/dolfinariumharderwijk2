@@ -88,14 +88,16 @@ sudo cp mysql-connector-java-8.0.33/mysql-connector-java-8.0.33.jar /etc/guacamo
 
 # Configure MySQL database
 sudo mysql --execute="CREATE DATABASE guacamole_db;"
-sudo mysql --execute="CREATE USER 'guacamole_user'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';"
+sudo mysql --execute="CREATE USER 'guacamole_user'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_PASSWORD}';"
 sudo mysql --execute="GRANT SELECT,INSERT,UPDATE,DELETE ON guacamole_db.* TO 'guacamole_user'@'localhost';"
 sudo mysql --execute="FLUSH PRIVILEGES;"
 
 # Import Guacamole schema
-cat guacamole-auth-jdbc-${GUACAMOLE_VERSION}/mysql/schema/*.sql | sudo mysql guacamole_db
+cat guacamole-auth-jdbc-${GUACAMOLE_VERSION}/mysql/schema/*.sql | sudo mysql guacamole_db || {
+    echo "Error importing schema. Check the MySQL logs.";
+    exit 1;
+}
 
-# Configure Guacamole properties
 # Configure Guacamole properties
 echo "mysql-hostname: localhost
 mysql-port: 3306
@@ -113,11 +115,15 @@ sudo chmod -R 755 /etc/guacamole
 
 # Reset MySQL user and set up initial admin account
 sudo mysql -u guacamole_user -p${MYSQL_PASSWORD} -D guacamole_db -e "
-DELETE FROM guacamole_user WHERE user_id = 1;
+DELETE FROM guacamole_user WHERE entity_id IN (SELECT entity_id FROM guacamole_entity WHERE name='guacadmin');
+DELETE FROM guacamole_entity WHERE name='guacadmin';
 INSERT INTO guacamole_entity (name, type) VALUES ('guacadmin', 'USER');
-INSERT INTO guacamole_user (entity_id, password_hash, password_salt, password_date)
-SELECT entity_id, UNHEX(SHA2(CONCAT('guacadmin', HEX(RANDOM_BYTES(32))), 256)), RANDOM_BYTES(32), NOW()
-FROM guacamole_entity WHERE name = 'guacadmin';"
+SET @entity_id = LAST_INSERT_ID();
+INSERT INTO guacamole_user (entity_id, password_hash, password_salt, password_date, disabled)
+VALUES (@entity_id, UNHEX(SHA2(CONCAT('guacadmin', 'salt'), 256)), 'salt', NOW(), 0);" || {
+    echo "Error configuring admin user. Check the MySQL logs.";
+    exit 1;
+}
 # Restart services
 sudo systemctl restart guacd
 sudo systemctl restart tomcat
