@@ -58,4 +58,4 @@
         '@;
         $path = 'C:\inetpub\wwwroot\index.html';
         $htmlContent | Out-File -FilePath $path -Encoding utf8;
-        Restart-Service W3SVC;"
+        Restart-Service W3SVC;
