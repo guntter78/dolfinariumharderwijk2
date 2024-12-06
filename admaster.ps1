@@ -1,11 +1,12 @@
 param (
     [string]$DomainName,
     [string]$NetbiosName,
-    [SecureString]$SafeModeAdministratorPassword
+    [string]$SafeModeAdministratorPassword
 )
 
-# Lokale locatie waar scripts staan (gedownload door Custom Script Extension)
-$localPath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\Downloads\0"
+# Zoek de juiste downloadmap
+$basePath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\Downloads"
+$localPath = Get-ChildItem -Path $basePath | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Select-Object -ExpandProperty FullName
 
 # Controleer of de map bestaat
 if (!(Test-Path -Path $localPath)) {
@@ -13,13 +14,18 @@ if (!(Test-Path -Path $localPath)) {
     exit 1
 }
 
+Write-Host "Scripts gevonden in map: $localPath"
+
+# Converteer het wachtwoord naar een SecureString
+$SecurePassword = ConvertTo-SecureString $SafeModeAdministratorPassword -AsPlainText -Force
+
 # Active Directory configureren
 Write-Host "Stap 1: Configureren van Active Directory..."
 try {
     powershell -ExecutionPolicy Bypass -File "$localPath\admake.ps1" `
         -DomainName $DomainName `
         -NetbiosName $NetbiosName `
-        -SafeModeAdministratorPassword $SafeModeAdministratorPassword -ErrorAction Stop
+        -SafeModeAdministratorPassword $SecurePassword -ErrorAction Stop
     Write-Host "Active Directory configuratie voltooid."
 } catch {
     Write-Error "Fout bij het configureren van Active Directory: $($_.Exception.Message)"
