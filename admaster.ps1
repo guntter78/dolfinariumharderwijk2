@@ -1,34 +1,42 @@
 param (
     [string]$DomainName,
     [string]$NetbiosName,
-    [SecureString]$SafeModeAdministratorPassword,
-    [SecureString]$AdminPassword,
-    [SecureString]$ServiceAccountPassword,
-    [SecureString]$GuestPassword
+    [SecureString]$SafeModeAdministratorPassword
 )
 
-$scriptPath = "C:\Scripts"
+# Download scripts van GitHub
+$scriptRepo = "https://raw.githubusercontent.com/guntter78/dolfinariumharderwijk2/main/"
+$scripts = @("ad.ps1", "aduser.ps1", "iis.ps1", "dhcp.ps1")
+$localPath = "C:\Scripts"
 
-# Stap 1: Active Directory configureren
+if (!(Test-Path -Path $localPath)) {
+    New-Item -ItemType Directory -Path $localPath
+}
+
+foreach ($script in $scripts) {
+    $url = "$scriptRepo$script"
+    $destination = Join-Path -Path $localPath -ChildPath $script
+    Write-Host "Downloaden van $url naar $destination..."
+    Invoke-WebRequest -Uri $url -OutFile $destination -UseBasicParsing
+}
+
+# Active Directory configureren
 Write-Host "Stap 1: Configureren van Active Directory..."
-powershell -ExecutionPolicy Bypass -File "$scriptPath\ad.ps1" `
+powershell -ExecutionPolicy Bypass -File "$localPath\ad.ps1" `
     -DomainName $DomainName `
     -NetbiosName $NetbiosName `
     -SafeModeAdministratorPassword $SafeModeAdministratorPassword
 
-# Stap 2: Gebruikers toevoegen
+# Gebruikers toevoegen
 Write-Host "Stap 2: Gebruikers toevoegen..."
-powershell -ExecutionPolicy Bypass -File "$scriptPath\aduser.ps1" `
-    -AdminPassword $AdminPassword `
-    -ServiceAccountPassword $ServiceAccountPassword `
-    -GuestPassword $GuestPassword
+powershell -ExecutionPolicy Bypass -File "$localPath\aduser.ps1"
 
-# Stap 3: IIS configureren
+# IIS configureren
 Write-Host "Stap 3: IIS configureren..."
-powershell -ExecutionPolicy Bypass -File "$scriptPath\iis.ps1"
+powershell -ExecutionPolicy Bypass -File "$localPath\iis.ps1"
 
-# Stap 4: DHCP configureren
+# DHCP configureren
 Write-Host "Stap 4: DHCP configureren..."
-powershell -ExecutionPolicy Bypass -File "$scriptPath\dhcp.ps1"
+powershell -ExecutionPolicy Bypass -File "$localPath\dhcp.ps1"
 
-Write-Host "Alle configuraties zijn voltooid."
+Write-Host "Alle configuraties zijn voltooid!"
