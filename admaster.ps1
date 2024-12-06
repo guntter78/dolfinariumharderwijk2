@@ -5,14 +5,13 @@ param (
 )
 
 # Specificeer de exacte map
-$localPath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.10.17\Downloads\2"
+$localPath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.10.17\Downloads\0"
 
 # Controleer of de map bestaat
 if (!(Test-Path -Path $localPath)) {
     Write-Error "Scripts zijn niet gevonden in de map: $localPath"
     exit 1
 }
-
 Write-Host "Scripts gevonden in map: $localPath"
 
 # Converteer het wachtwoord naar een SecureString
