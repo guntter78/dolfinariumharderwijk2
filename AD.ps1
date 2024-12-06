@@ -44,7 +44,7 @@
 
         # IIS Configuratie
         Install-WindowsFeature -Name Web-Server -IncludeManagementTools;
-        $htmlContent = @'
+        $htmlContent = @"
         <!DOCTYPE html>
         <html>
           <head>
@@ -55,7 +55,7 @@
             <p>Deze webpagina is automatisch aangemaakt via Bicep!</p>
           </body>
         </html>
-        '@;
+        "@;
         $path = 'C:\inetpub\wwwroot\index.html';
         $htmlContent | Out-File -FilePath $path -Encoding utf8;
         Restart-Service W3SVC;
