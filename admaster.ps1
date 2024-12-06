@@ -4,13 +4,12 @@ param (
     [string]$SafeModeAdministratorPassword
 )
 
-# Zoek de juiste downloadmap
-$basePath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\Downloads"
-$localPath = Get-ChildItem -Path $basePath | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Select-Object -ExpandProperty FullName
+# Specificeer de exacte map
+$localPath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.10.17\Downloads\2"
 
 # Controleer of de map bestaat
 if (!(Test-Path -Path $localPath)) {
-    Write-Error "Scripts zijn niet gevonden in de verwachte map: $localPath"
+    Write-Error "Scripts zijn niet gevonden in de map: $localPath"
     exit 1
 }
 
