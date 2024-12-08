@@ -42,7 +42,6 @@ try {
     Install-ADDSForest `
         -DomainName $DomainName `
         -DomainNetbiosName $NetbiosName `
-        -ForestMode Win2019 `
         -SafeModeAdministratorPassword $SecurePassword `
         -Force
     Write-Host "Active Directory configuratie voltooid. De server zal opnieuw opstarten."
