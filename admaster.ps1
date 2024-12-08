@@ -30,62 +30,32 @@ Write-Log "Start van configuratie admaster.ps1"
 # 🔍 Controleer of AD al is geïnstalleerd
 # ========================
 if (Test-Path $markerFile) {
-    Write-Log "Active Directory is al geïnstalleerd. Sla de installatie over."
-    exit 0
-}
+    Write-Log "Active Directory is al geïnstalleerd. Sla de AD-configuratie over, maar voer overige taken uit."
+} else {
+    try {
+        Write-Log "Active Directory is nog niet geconfigureerd. Ga door met de configuratie."
+        Write-Log "Stap 1: Installeren van Active Directory..."
+        Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools -ErrorAction Stop
+        Write-Log "AD-Domain-Services is succesvol geïnstalleerd."
+    } catch {
+        Write-Log "Fout bij het installeren van de AD DS-rol: $($_.Exception.Message)"
+        exit 1
+    }
 
-try {
-    $domainCheck = Get-ADDomain -ErrorAction Stop
-    Write-Log "Active Directory is al geconfigureerd. Sla de installatie over."
-    exit 0
-} catch {
-    Write-Log "Active Directory is nog niet geconfigureerd. Ga door met de configuratie."
-}
-
-# ========================
-# 🔐 Converteer wachtwoord naar SecureString
-# ========================
-try {
-    $SecurePassword = ConvertTo-SecureString $SafeModeAdministratorPassword -AsPlainText -Force
-} catch {
-    Write-Log "Fout bij het converteren van het wachtwoord naar SecureString: $($_.Exception.Message)"
-    exit 1
-}
-
-# ========================
-# 📁 Controleer of het scriptbestand aanwezig is
-# ========================
-if (!(Test-Path -Path $localPath)) {
-    Write-Log "Scripts zijn niet gevonden in de map: $localPath"
-    exit 1
-}
-Write-Log "Scripts gevonden in map: $localPath"
-
-# ========================
-# ⚙️ Installeer Active Directory (AD)
-# ========================
-try {
-    Write-Log "Stap 1: Installeren van Active Directory..."
-    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools -ErrorAction Stop
-    Write-Log "AD-Domain-Services is succesvol geïnstalleerd."
-} catch {
-    Write-Log "Fout bij het installeren van de AD DS-rol: $($_.Exception.Message)"
-    exit 1
-}
-
-try {
-    Write-Log "Stap 2: Configureren van een nieuwe Active Directory Forest..."
-    Install-ADDSForest `
-        -DomainName $DomainName `
-        -DomainNetbiosName $NetbiosName `
-        -SafeModeAdministratorPassword $SecurePassword `
-        -Force
-    Write-Log "Active Directory Forest-configuratie voltooid."
-    New-Item -ItemType File -Path $markerFile
-    Write-Log "Marker-bestand aangemaakt: $markerFile"
-} catch {
-    Write-Log "Fout bij het configureren van de AD-forest: $($_.Exception.Message)"
-    exit 1
+    try {
+        Write-Log "Stap 2: Configureren van een nieuwe Active Directory Forest..."
+        Install-ADDSForest `
+            -DomainName $DomainName `
+            -DomainNetbiosName $NetbiosName `
+            -SafeModeAdministratorPassword $SecurePassword `
+            -Force
+        Write-Log "Active Directory Forest-configuratie voltooid."
+        New-Item -ItemType File -Path $markerFile
+        Write-Log "Marker-bestand aangemaakt: $markerFile"
+    } catch {
+        Write-Log "Fout bij het configureren van de AD-forest: $($_.Exception.Message)"
+        exit 1
+    }
 }
 
 # ========================
