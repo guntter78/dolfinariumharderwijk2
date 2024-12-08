@@ -10,7 +10,7 @@ param (
 # ========================
 # 📁 Pad naar bestanden
 # ========================C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.10.17\Downloads\0
-$localPath = ""
+$localPath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.10.17\Downloads\0"
 $markerFile = "C:\ADInstallComplete.txt"
 $paramFilePath = "C:\ad-params.json"
 $logFile = "C:\ConfigLog.txt"
@@ -32,15 +32,49 @@ Write-Log "Start van configuratie admaster.ps1"
 # ========================
 if (-not (Test-Path $paramFilePath)) {
     Write-Log "Sla parameters op in: $paramFilePath"
+
+    # Haal de wachtwoorden op uit protectedSettings
+    try {
+        $protectedSettings = ConvertFrom-Json $env:AZURE_PROTECTED_SETTINGS
+
+        $SafeModeAdministratorPassword = $protectedSettings.SafeModeAdministratorPassword | ConvertTo-SecureString -AsPlainText -Force
+        $AdminPassword = $protectedSettings.AdminPassword | ConvertTo-SecureString -AsPlainText -Force
+        $ServiceAccountPassword = $protectedSettings.ServiceAccountPassword | ConvertTo-SecureString -AsPlainText -Force
+        $GuestPassword = $protectedSettings.GuestPassword | ConvertTo-SecureString -AsPlainText -Force
+
+        Write-Log "Wachtwoorden zijn succesvol opgehaald uit protectedSettings."
+    } catch {
+        Write-Log "Fout bij het ophalen van de wachtwoorden uit protectedSettings: $($_.Exception.Message)"
+        exit 1
+    }
+
+    # Sla de wachtwoorden versleuteld op in het parameterbestand
     $parameters = @{
-        SafeModeAdministratorPassword = $SafeModeAdministratorPassword | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString
+        SafeModeAdministratorPassword = $SafeModeAdministratorPassword | ConvertFrom-SecureString
+        AdminPassword = $AdminPassword | ConvertFrom-SecureString
+        ServiceAccountPassword = $ServiceAccountPassword | ConvertFrom-SecureString
+        GuestPassword = $GuestPassword | ConvertFrom-SecureString
     }
     $parameters | ConvertTo-Json -Depth 10 | Out-File -FilePath $paramFilePath -Force
+
     Write-Log "Parameterbestand aangemaakt: $paramFilePath"
 } else {
     Write-Log "Lees parameterbestand in: $paramFilePath"
-    $parameters = Get-Content -Path $paramFilePath | ConvertFrom-Json
-    $SafeModeAdministratorPassword = $parameters.SafeModeAdministratorPassword | ConvertTo-SecureString
+    
+    # Lees de opgeslagen wachtwoorden opnieuw in
+    try {
+        $parameters = Get-Content -Path $paramFilePath | ConvertFrom-Json
+
+        $SafeModeAdministratorPassword = $parameters.SafeModeAdministratorPassword | ConvertTo-SecureString
+        $AdminPassword = $parameters.AdminPassword | ConvertTo-SecureString
+        $ServiceAccountPassword = $parameters.ServiceAccountPassword | ConvertTo-SecureString
+        $GuestPassword = $parameters.GuestPassword | ConvertTo-SecureString
+
+        Write-Log "Wachtwoorden zijn succesvol opgehaald uit het parameterbestand."
+    } catch {
+        Write-Log "Fout bij het lezen van het parameterbestand: $($_.Exception.Message)"
+        exit 1
+    }
 }
 
 # ========================
@@ -91,14 +125,16 @@ if (Test-Path $markerFile) {
 # ========================
 try {
     Write-Log "Stap 3: Gebruikers toevoegen..."
-    powershell -ExecutionPolicy Bypass -File "$localPath\aduser.ps1" `
-        -AdminPassword $SecurePassword `
-        -ErrorAction Stop
+    
+    # Voer aduser.ps1 uit, zonder wachtwoorden als argumenten
+    powershell -ExecutionPolicy Bypass -File "$localPath\aduser.ps1" -ErrorAction Stop
+
     Write-Log "Gebruikers succesvol toegevoegd."
 } catch {
     Write-Log "Fout bij het toevoegen van gebruikers: $($_.Exception.Message)"
     exit 1
 }
+
 
 # ========================
 # 🌐 Configureer IIS

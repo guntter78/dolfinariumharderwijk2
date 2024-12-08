@@ -1,13 +1,7 @@
-param (
-    [SecureString]$AdminPassword,
-    [SecureString]$ServiceAccountPassword,
-    [SecureString]$GuestPassword
-)
-
 # ========================
 # 📁 Pad naar logbestand
 # ========================
-$logFile = "C:\ConfigLog.txt"
+$logFile = "C:\makeaduserlog.txt"
 
 # ========================
 # 📝 Functie: Logging
@@ -21,37 +15,81 @@ function Write-Log {
 
 Write-Log "Start van aduser.ps1 - Toevoegen van gebruikers aan Active Directory..."
 
-# ========================
-# 🔍 Organizational Units
-# ========================
-New-ADOrganizationalUnit -Name "Students" -Path "DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-New-ADOrganizationalUnit -Name "Staff" -Path "DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-New-ADOrganizationalUnit -Name "ICT Support" -Path "DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-Write-Log "OU's zijn aangemaakt (indien nodig)."
+# 🔐 Haal de wachtwoorden op uit protectedSettings
+try {
+    $protectedSettings = ConvertFrom-Json $env:AZURE_PROTECTED_SETTINGS
 
-# ========================
-# 🔍 Groepen
-# ========================
-New-ADGroup -Name "Administrators" -GroupScope Global -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-New-ADGroup -Name "Students" -GroupScope Global -Path "OU=Students,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-Write-Log "Groepen zijn aangemaakt (indien nodig)."
+    $AdminPassword = $protectedSettings.AdminPassword | ConvertTo-SecureString -AsPlainText -Force
+    $ServiceAccountPassword = $protectedSettings.ServiceAccountPassword | ConvertTo-SecureString -AsPlainText -Force
+    $GuestPassword = $protectedSettings.GuestPassword | ConvertTo-SecureString -AsPlainText -Force
 
-# ========================
-# 🔍 Serviceaccounts
-# ========================
-New-ADUser -Name "NPE-Account" -AccountPassword $ServiceAccountPassword -Enabled $true -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-New-ADUser -Name "GuestAccount" -AccountPassword $GuestPassword -Enabled $true -Path "OU=Students,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-Write-Log "Serviceaccounts zijn aangemaakt (indien nodig)."
-
-# ========================
-# 🔍 Admin Gebruikers
-# ========================
-$adminUsers = @("rudyadmin", "marnixadmin", "allardadmin", "wilmeradmin", "emmaadmin")
-foreach ($user in $adminUsers) {
-    New-ADUser -Name $user -AccountPassword $AdminPassword -Enabled $true -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
-    Add-ADGroupMember -Identity "Administrators" -Members $user -ErrorAction SilentlyContinue
-    Write-Log "Gebruiker $user is aangemaakt en toegevoegd aan de groep Administrators (indien nodig)."
+    Write-Log "Wachtwoorden zijn succesvol opgehaald en geconverteerd naar SecureString."
+} catch {
+    Write-Log "Fout bij het ophalen van de wachtwoorden: $($_.Exception.Message)"
+    exit 1
 }
 
-Write-Log "Gebruikersconfiguratie voltooid."
+# ========================
+# 📁 Maak Organizational Units aan
+# ========================
+try {
+    New-ADOrganizationalUnit -Name "Students" -Path "DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Organizational Unit 'Students' succesvol aangemaakt of bestaat al."
+    
+    New-ADOrganizationalUnit -Name "Staff" -Path "DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Organizational Unit 'Staff' succesvol aangemaakt of bestaat al."
+    
+    New-ADOrganizationalUnit -Name "ICT Support" -Path "DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Organizational Unit 'ICT Support' succesvol aangemaakt of bestaat al."
+} catch {
+    Write-Log "Fout bij het aanmaken van de Organizational Units: $($_.Exception.Message)"
+}
+
+# ========================
+# 📁 Maak Groepen aan
+# ========================
+try {
+    New-ADGroup -Name "Administrators" -GroupScope Global -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Groep 'Administrators' succesvol aangemaakt of bestaat al."
+
+    New-ADGroup -Name "Students" -GroupScope Global -Path "OU=Students,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Groep 'Students' succesvol aangemaakt of bestaat al."
+} catch {
+    Write-Log "Fout bij het aanmaken van groepen: $($_.Exception.Message)"
+}
+
+# ========================
+# 📁 Maak serviceaccounts aan
+# ========================
+try {
+    New-ADUser -Name "NPE-Account" -AccountPassword $ServiceAccountPassword -Enabled $true -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Serviceaccount 'NPE-Account' succesvol aangemaakt."
+
+    New-ADUser -Name "GuestAccount" -AccountPassword $GuestPassword -Enabled $true -Path "OU=Students,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Serviceaccount 'GuestAccount' succesvol aangemaakt."
+} catch {
+    Write-Log "Fout bij het aanmaken van serviceaccounts: $($_.Exception.Message)"
+}
+
+# ========================
+# 📁 Voeg admin-gebruikers toe
+# ========================
+try {
+    $adminUsers = @("rudyadmin", "marnixadmin", "allardadmin", "wilmeradmin", "emmaadmin")
+    foreach ($user in $adminUsers) {
+        try {
+            New-ADUser -Name $user -AccountPassword $AdminPassword -Enabled $true -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+            Write-Log "Admin gebruiker '$user' succesvol aangemaakt."
+            
+            Add-ADGroupMember -Identity "Administrators" -Members $user -ErrorAction SilentlyContinue
+            Write-Log "Gebruiker '$user' succesvol toegevoegd aan de groep 'Administrators'."
+        } catch {
+            Write-Log "Fout bij het aanmaken van admin gebruiker '$user': $($_.Exception.Message)"
+        }
+    }
+} catch {
+    Write-Log "Fout bij het toevoegen van admin-gebruikers: $($_.Exception.Message)"
+}
+
+Write-Log "Einde van aduser.ps1 - Alle gebruikers zijn succesvol toegevoegd."
 exit 0
