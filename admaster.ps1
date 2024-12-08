@@ -9,9 +9,10 @@ param (
 
 # ========================
 # 📁 Pad naar bestanden
-# ========================
-$localPath = "C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.10.17\Downloads\0"
+# ========================C:\Packages\Plugins\Microsoft.Compute.CustomScriptExtension\1.10.17\Downloads\0
+$localPath = ""
 $markerFile = "C:\ADInstallComplete.txt"
+$paramFilePath = "C:\ad-params.json"
 $logFile = "C:\ConfigLog.txt"
 
 # ========================
@@ -26,6 +27,21 @@ function Write-Log {
 
 Write-Log "Start van configuratie admaster.ps1"
 
+# ========================
+# 🔍 Parameterpersistentie
+# ========================
+if (-not (Test-Path $paramFilePath)) {
+    Write-Log "Sla parameters op in: $paramFilePath"
+    $parameters = @{
+        SafeModeAdministratorPassword = $SafeModeAdministratorPassword | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString
+    }
+    $parameters | ConvertTo-Json -Depth 10 | Out-File -FilePath $paramFilePath -Force
+    Write-Log "Parameterbestand aangemaakt: $paramFilePath"
+} else {
+    Write-Log "Lees parameterbestand in: $paramFilePath"
+    $parameters = Get-Content -Path $paramFilePath | ConvertFrom-Json
+    $SafeModeAdministratorPassword = $parameters.SafeModeAdministratorPassword | ConvertTo-SecureString
+}
 
 # ========================
 # 🔐 Converteer wachtwoord naar SecureString
@@ -75,7 +91,9 @@ if (Test-Path $markerFile) {
 # ========================
 try {
     Write-Log "Stap 3: Gebruikers toevoegen..."
-    powershell -ExecutionPolicy Bypass -File "$localPath\aduser.ps1" -ErrorAction Stop
+    powershell -ExecutionPolicy Bypass -File "$localPath\aduser.ps1" `
+        -AdminPassword $SecurePassword `
+        -ErrorAction Stop
     Write-Log "Gebruikers succesvol toegevoegd."
 } catch {
     Write-Log "Fout bij het toevoegen van gebruikers: $($_.Exception.Message)"
