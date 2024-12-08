@@ -17,53 +17,73 @@ if (!(Test-Path -Path $localPath)) {
 }
 Write-Host "Scripts gevonden in map: $localPath"
 
-# Check of dit de tweede keer is dat het script wordt uitgevoerd
-$flagFile = "C:\post-ad-config-completed.txt"
-if (Test-Path $flagFile) {
-    Write-Host "Post AD-configuratie is al voltooid. Dit script wordt niet opnieuw uitgevoerd."
-    exit 0
-}
-
 # Converteer het wachtwoord naar een SecureString
 $SecurePassword = ConvertTo-SecureString $SafeModeAdministratorPassword -AsPlainText -Force
 
-# Voeg een RunOnce-opdracht toe voor na de herstart
-$runOnceCommand = "powershell.exe -ExecutionPolicy Bypass -File '$localPath\admaster.ps1' -DomainName $DomainName -NetbiosName $NetbiosName -SafeModeAdministratorPassword $SafeModeAdministratorPassword"
-Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce' `
-    -Name 'PostADConfig' `
-    -Value $runOnceCommand
-
-# Active Directory configureren
-Write-Host "Stap 1: Installeren en configureren van Active Directory..."
-
-# Import the Server Manager module
-Import-Module ServerManager
-
-# Install the AD DS role
-Write-Host "Installing Active Directory Domain Services (AD DS) role..."
+# Controleer of AD al is geconfigureerd
 try {
-    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools -ErrorAction Stop
-    Write-Host "AD DS role installed successfully."
+    $domainCheck = Get-ADDomain -ErrorAction Stop
+    Write-Host "Active Directory is al geconfigureerd. Sla de installatie over."
+    $adExists = $true
 } catch {
-    Write-Error "Fout bij het installeren van de AD DS-rol: $($_.Exception.Message)"
-    exit 1
+    Write-Host "Active Directory is nog niet geconfigureerd. Ga door met de configuratie."
+    $adExists = $false
 }
 
-# Configure a new Active Directory Forest
-Write-Host "Configuring a new Active Directory Forest..."
-try {
-    Install-ADDSForest `
-        -DomainName $DomainName `
-        -DomainNetbiosName $NetbiosName `
-        -SafeModeAdministratorPassword $SecurePassword `
-        -Force
-    Write-Host "Active Directory configuratie voltooid. De server zal opnieuw opstarten."
-} catch {
-    Write-Error "Fout bij het configureren van de AD-forest: $($_.Exception.Message)"
-    exit 1
+# Voer AD-installatie alleen uit als het nog niet is geconfigureerd
+if (-not $adExists) {
+    # Active Directory configureren
+    Write-Host "Stap 1: Installeren en configureren van Active Directory..."
+
+    # Import the Server Manager module
+    Import-Module ServerManager
+
+    # Install the AD DS role
+    Write-Host "Installing Active Directory Domain Services (AD DS) role..."
+    try {
+        Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools -ErrorAction Stop
+        Write-Host "AD DS role installed successfully."
+    } catch {
+        Write-Error "Fout bij het installeren van de AD DS-rol: $($_.Exception.Message)"
+        exit 1
+    }
+
+    # Configure a new Active Directory Forest
+    Write-Host "Configuring a new Active Directory Forest..."
+    try {
+        Install-ADDSForest `
+            -DomainName $DomainName `
+            -DomainNetbiosName $NetbiosName `
+            -SafeModeAdministratorPassword $SecurePassword `
+            -Force
+        Write-Host "Active Directory configuratie voltooid. De server zal opnieuw opstarten."
+    } catch {
+        Write-Error "Fout bij het configureren van de AD-forest: $($_.Exception.Message)"
+        exit 1
+    }
 }
 
-# De stappen na de herstart worden hieronder uitgevoerd
+# **Post-reboot configuratie**
+# Wacht tot ADWS (Active Directory Web Services) is gestart
+$timeout = 900  # Maximaal 15 minuten
+$startTime = Get-Date
+do {
+    try {
+        $adwsStatus = Get-Service -Name "ADWS" -ErrorAction Stop
+    } catch {
+        Write-Host "$(Get-Date) - Wachten op Active Directory Web Services (ADWS) om te starten..."
+    }
+    Start-Sleep -Seconds 30
+    $currentTime = Get-Date
+    $elapsedTime = ($currentTime - $startTime).TotalSeconds
+} until ($adwsStatus.Status -eq 'Running' -or $elapsedTime -ge $timeout)
+
+if ($adwsStatus.Status -eq 'Running') {
+    Write-Host "Active Directory Web Services (ADWS) is nu beschikbaar."
+} else {
+    Write-Error "ADWS is na 15 minuten nog niet gestart."
+    exit 1
+}
 
 # Gebruikers toevoegen
 Write-Host "Stap 2: Gebruikers toevoegen..."
@@ -94,8 +114,5 @@ try {
     Write-Error "Fout bij het configureren van DHCP: $($_.Exception.Message)"
     exit 1
 }
-
-# Markeer het script als voltooid door een bestand aan te maken
-New-Item -ItemType File -Path $flagFile
 
 Write-Host "Alle configuraties zijn succesvol voltooid!"
