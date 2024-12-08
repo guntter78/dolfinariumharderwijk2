@@ -1,7 +1,8 @@
 # ========================
-# 📁 Pad naar logbestand
+# 📁 Pad naar bestanden
 # ========================
 $logFile = "C:\makeaduserlog.txt"
+$paramFilePath = "C:\ad-params.json"
 
 # ========================
 # 📝 Functie: Logging
@@ -15,17 +16,22 @@ function Write-Log {
 
 Write-Log "Start van aduser.ps1 - Toevoegen van gebruikers aan Active Directory..."
 
-# 🔐 Haal de wachtwoorden op uit protectedSettings
+# 🔐 **Laad de wachtwoorden uit het JSON-bestand**
 try {
-    $protectedSettings = ConvertFrom-Json $env:AZURE_PROTECTED_SETTINGS
+    if (-not (Test-Path $paramFilePath)) {
+        Write-Log "Fout: Parameterbestand niet gevonden: $paramFilePath"
+        exit 1
+    }
 
-    $AdminPassword = $protectedSettings.AdminPassword | ConvertTo-SecureString -AsPlainText -Force
-    $ServiceAccountPassword = $protectedSettings.ServiceAccountPassword | ConvertTo-SecureString -AsPlainText -Force
-    $GuestPassword = $protectedSettings.GuestPassword | ConvertTo-SecureString -AsPlainText -Force
+    $parameters = Get-Content -Path $paramFilePath | ConvertFrom-Json
 
-    Write-Log "Wachtwoorden zijn succesvol opgehaald en geconverteerd naar SecureString."
+    $AdminPassword = $parameters.AdminPassword | ConvertTo-SecureString
+    $ServiceAccountPassword = $parameters.ServiceAccountPassword | ConvertTo-SecureString
+    $GuestPassword = $parameters.GuestPassword | ConvertTo-SecureString
+
+    Write-Log "Succesvol de wachtwoorden geladen uit $paramFilePath."
 } catch {
-    Write-Log "Fout bij het ophalen van de wachtwoorden: $($_.Exception.Message)"
+    Write-Log "Fout bij het lezen van het parameterbestand: $($_.Exception.Message)"
     exit 1
 }
 

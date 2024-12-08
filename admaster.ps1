@@ -4,8 +4,15 @@ param (
     [Parameter(Mandatory=$true)]
     [string]$NetbiosName,
     [Parameter(Mandatory=$true)]
-    [string]$SafeModeAdministratorPassword
+    [string]$SafeModeAdministratorPassword,
+    [Parameter(Mandatory=$true)]
+    [string]$AdminPassword,
+    [Parameter(Mandatory=$true)]
+    [string]$ServiceAccountPassword,
+    [Parameter(Mandatory=$true)]
+    [string]$GuestPassword
 )
+
 
 # ========================
 # 📁 Pad naar bestanden
@@ -30,51 +37,22 @@ Write-Log "Start van configuratie admaster.ps1"
 # ========================
 # 🔍 Parameterpersistentie
 # ========================
-if (-not (Test-Path $paramFilePath)) {
-    Write-Log "Sla parameters op in: $paramFilePath"
+try {
+    $SecureAdminPassword = $AdminPassword | ConvertTo-SecureString -AsPlainText -Force
+    $SecureServiceAccountPassword = $ServiceAccountPassword | ConvertTo-SecureString -AsPlainText -Force
+    $SecureGuestPassword = $GuestPassword | ConvertTo-SecureString -AsPlainText -Force
 
-    # Haal de wachtwoorden op uit protectedSettings
-    try {
-        $protectedSettings = ConvertFrom-Json $env:AZURE_PROTECTED_SETTINGS
-
-        $SafeModeAdministratorPassword = $protectedSettings.SafeModeAdministratorPassword | ConvertTo-SecureString -AsPlainText -Force
-        $AdminPassword = $protectedSettings.AdminPassword | ConvertTo-SecureString -AsPlainText -Force
-        $ServiceAccountPassword = $protectedSettings.ServiceAccountPassword | ConvertTo-SecureString -AsPlainText -Force
-        $GuestPassword = $protectedSettings.GuestPassword | ConvertTo-SecureString -AsPlainText -Force
-
-        Write-Log "Wachtwoorden zijn succesvol opgehaald uit protectedSettings."
-    } catch {
-        Write-Log "Fout bij het ophalen van de wachtwoorden uit protectedSettings: $($_.Exception.Message)"
-        exit 1
-    }
-
-    # Sla de wachtwoorden versleuteld op in het parameterbestand
     $parameters = @{
-        SafeModeAdministratorPassword = $SafeModeAdministratorPassword | ConvertFrom-SecureString
-        AdminPassword = $AdminPassword | ConvertFrom-SecureString
-        ServiceAccountPassword = $ServiceAccountPassword | ConvertFrom-SecureString
-        GuestPassword = $GuestPassword | ConvertFrom-SecureString
+        AdminPassword = $SecureAdminPassword | ConvertFrom-SecureString
+        ServiceAccountPassword = $SecureServiceAccountPassword | ConvertFrom-SecureString
+        GuestPassword = $SecureGuestPassword | ConvertFrom-SecureString
     }
+
     $parameters | ConvertTo-Json -Depth 10 | Out-File -FilePath $paramFilePath -Force
-
-    Write-Log "Parameterbestand aangemaakt: $paramFilePath"
-} else {
-    Write-Log "Lees parameterbestand in: $paramFilePath"
-    
-    # Lees de opgeslagen wachtwoorden opnieuw in
-    try {
-        $parameters = Get-Content -Path $paramFilePath | ConvertFrom-Json
-
-        $SafeModeAdministratorPassword = $parameters.SafeModeAdministratorPassword | ConvertTo-SecureString
-        $AdminPassword = $parameters.AdminPassword | ConvertTo-SecureString
-        $ServiceAccountPassword = $parameters.ServiceAccountPassword | ConvertTo-SecureString
-        $GuestPassword = $parameters.GuestPassword | ConvertTo-SecureString
-
-        Write-Log "Wachtwoorden zijn succesvol opgehaald uit het parameterbestand."
-    } catch {
-        Write-Log "Fout bij het lezen van het parameterbestand: $($_.Exception.Message)"
-        exit 1
-    }
+    Write-Log "Wachtwoorden opgeslagen in: $paramFilePath"
+} catch {
+    Write-Log "Fout bij het opslaan van de wachtwoorden in JSON-bestand: $($_.Exception.Message)"
+    exit 1
 }
 
 # ========================
