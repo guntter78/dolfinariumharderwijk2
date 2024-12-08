@@ -1,6 +1,9 @@
 param (
+    [Parameter(Mandatory=$true)]
     [string]$DomainName,
+    [Parameter(Mandatory=$true)]
     [string]$NetbiosName,
+    [Parameter(Mandatory=$true)]
     [string]$SafeModeAdministratorPassword
 )
 
