@@ -26,6 +26,18 @@ function Write-Log {
 
 Write-Log "Start van configuratie admaster.ps1"
 
+
+# ========================
+# 🔐 Converteer wachtwoord naar SecureString
+# ========================
+try {
+    $SecurePassword = ConvertTo-SecureString $SafeModeAdministratorPassword -AsPlainText -Force
+} catch {
+    Write-Log "Fout bij het converteren van het wachtwoord naar SecureString: $($_.Exception.Message)"
+    exit 1
+}
+
+
 # ========================
 # 🔍 Controleer of AD al is geïnstalleerd
 # ========================
