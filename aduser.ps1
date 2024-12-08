@@ -14,6 +14,28 @@ function Write-Log {
     Write-Output $logMessage | Out-File -FilePath $logFile -Append
 }
 
+# 🔄 **Wachten tot ADWS actief is**
+try {
+    $maxWaitTime = 600 # Wacht maximaal 10 minuten (600 seconden)
+    $waitInterval = 30 # Controleer elke 30 seconden
+    $elapsedTime = 0
+
+    Write-Log "Controleer of AD Web Services actief is..."
+    while (-not (Get-Service -Name "ADWS" -ErrorAction SilentlyContinue).Status -eq "Running") {
+        if ($elapsedTime -ge $maxWaitTime) {
+            Write-Log "Timeout bereikt: AD Web Services is nog steeds niet actief na $maxWaitTime seconden."
+            exit 1
+        }
+        Write-Log "AD Web Services is nog niet actief. Wachten gedurende $waitInterval seconden..."
+        Start-Sleep -Seconds $waitInterval
+        $elapsedTime += $waitInterval
+    }
+    Write-Log "AD Web Services is actief. Ga verder met gebruikersconfiguratie."
+} catch {
+    Write-Log "Fout bij het controleren van de status van AD Web Services: $($_.Exception.Message)"
+    exit 1
+}
+
 Write-Log "Start van aduser.ps1 - Toevoegen van gebruikers aan Active Directory..."
 
 # 🔐 **Laad de wachtwoorden uit het JSON-bestand**
