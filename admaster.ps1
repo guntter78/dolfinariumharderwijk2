@@ -18,15 +18,33 @@ Write-Host "Scripts gevonden in map: $localPath"
 $SecurePassword = ConvertTo-SecureString $SafeModeAdministratorPassword -AsPlainText -Force
 
 # Active Directory configureren
-Write-Host "Stap 1: Configureren van Active Directory..."
+Write-Host "Stap 1: Installeren en configureren van Active Directory..."
+
+# Import the Server Manager module
+Import-Module ServerManager
+
+# Install the AD DS role
+Write-Host "Installing Active Directory Domain Services (AD DS) role..."
 try {
-    powershell -ExecutionPolicy Bypass -File "$localPath\admake.ps1" `
-        -DomainName $DomainName `
-        -NetbiosName $NetbiosName `
-        -SafeModeAdministratorPassword $SecurePassword -ErrorAction Stop
-    Write-Host "Active Directory configuratie voltooid."
+    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools -ErrorAction Stop
+    Write-Host "AD DS role installed successfully."
 } catch {
-    Write-Error "Fout bij het configureren van Active Directory: $($_.Exception.Message)"
+    Write-Error "Fout bij het installeren van de AD DS-rol: $($_.Exception.Message)"
+    exit 1
+}
+
+# Configure a new Active Directory Forest
+Write-Host "Configuring a new Active Directory Forest..."
+try {
+    Install-ADDSForest `
+        -DomainName $DomainName `
+        -DomainNetbiosName $NetbiosName `
+        -ForestMode Win2019 `
+        -SafeModeAdministratorPassword $SecurePassword `
+        -Force
+    Write-Host "Active Directory configuratie voltooid. De server zal opnieuw opstarten."
+} catch {
+    Write-Error "Fout bij het configureren van de AD-forest: $($_.Exception.Message)"
     exit 1
 }
 
