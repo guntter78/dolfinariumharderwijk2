@@ -2,7 +2,7 @@
 #   [Parameter(Mandatory=$false)]
 #   [string]$IpAddress,
 #   [Parameter(Mandatory=$false)]
-#   [string]$Username,
+#   [string]$Username,https://github.com/guntter78/dolfinariumharderwijk2/blob/main/werkpleksetup.ps1
 #   [Parameter(Mandatory=$true)]
 #   [string]$DomainName,
 #   [Parameter(Mandatory=$true)]
