@@ -14,65 +14,33 @@ function Write-Log {
     Write-Output $logMessage | Out-File -FilePath $logFile -Append
 }
 
-# ========================
-# 🔄 Controleer of de ADWS-service actief is en Active Directory toegankelijk is
-# ========================
+# 🔄 **Wachten tot ADWS actief is**
 try {
-    Write-Log "🔍 Controleren of de ADWS-service actief is en of Active Directory toegankelijk is..."
-    
-    # 1️⃣ **Controleer en start ADWS-service**
-    $adwsService = Get-Service -Name 'ADWS' -ErrorAction SilentlyContinue
-
-    if ($adwsService.Status -ne 'Running') {
-        Write-Log "⚠️ ADWS-service is niet actief. Probeer de service te starten..."
-        
-        # Start de service
-        Start-Service -Name 'ADWS'
-        
-        # Wachten tot de service actief is
-        $maxWaitTime = 300 # Maximaal 5 minuten (300 seconden)
-        $waitInterval = 10 # Elke 10 seconden controleren
-        $elapsedTime = 0
-
-        while ($adwsService.Status -ne 'Running') {
-            if ($elapsedTime -ge $maxWaitTime) {
-                Write-Log "❌ Timeout bereikt: ADWS-service is nog steeds niet beschikbaar na $maxWaitTime seconden."
-                exit 1
-            }
-            Write-Log "🔄 Wachten tot de ADWS-service actief is. Wachten gedurende $waitInterval seconden..."
-            Start-Sleep -Seconds $waitInterval
-            $elapsedTime += $waitInterval
-            $adwsService = Get-Service -Name 'ADWS' -ErrorAction SilentlyContinue
-        }
-
-        Write-Log "✅ ADWS-service is actief."
-    } else {
-        Write-Log "✅ ADWS-service is al actief."
-    }
-
-    # 2️⃣ **Controleer Active Directory-toegang met Test-ADServiceAccess**
+    $services = @("ADWS", "NTDS")
     $maxWaitTime = 1200 # Wacht maximaal 20 minuten (1200 seconden)
     $waitInterval = 30 # Controleer elke 30 seconden
     $elapsedTime = 0
 
-    Write-Log "🔍 Controleer of toegang tot Active Directory beschikbaar is met Test-ADServiceAccess."
-    while (-not (Test-ADServiceAccess -ErrorAction SilentlyContinue)) {
-        if ($elapsedTime -ge $maxWaitTime) {
-            Write-Log "❌ Timeout bereikt: Active Directory is nog steeds niet beschikbaar na $maxWaitTime seconden."
-            exit 1
+    Write-Log "Controleer of AD-diensten actief zijn: $($services -join ', ')"
+    foreach ($service in $services) {
+        while (-not (Get-Service -Name $service -ErrorAction SilentlyContinue).Status -eq "Running") {
+            if ($elapsedTime -ge $maxWaitTime) {
+                Write-Log "❌ Timeout bereikt: Service '$service' is nog steeds niet actief na $maxWaitTime seconden."
+                exit 1
+            }
+            Write-Log "🔄 Service '$service' is nog niet actief. Wachten gedurende $waitInterval seconden..."
+            Start-Sleep -Seconds $waitInterval
+            $elapsedTime += $waitInterval
         }
-        Write-Log "🔄 Active Directory is nog niet beschikbaar. Wachten gedurende $waitInterval seconden..."
-        Start-Sleep -Seconds $waitInterval
-        $elapsedTime += $waitInterval
+        Write-Log "✅ Service '$service' is actief."
     }
-
-    Write-Log "✅ Active Directory is beschikbaar."
 } catch {
-    Write-Log "❌ Fout bij het controleren van de ADWS-service of Active Directory: $($_.Exception.Message)"
+    Write-Log "❌ Fout bij het controleren van de status van AD-diensten: $($_.Exception.Message)"
     exit 1
 }
 
-Write-Log "✅ Controle van de ADWS-service en Active Directory-toegang is voltooid."
+Write-Log "Start van aduser.ps1 - Toevoegen van gebruikers aan Active Directory..."
+
 # 🔐 **Laad de wachtwoorden uit het JSON-bestand**
 try {
     if (-not (Test-Path $paramFilePath)) {
