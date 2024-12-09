@@ -15,6 +15,3 @@
         Invoke-WebRequest -Uri https://go.microsoft.com/fwlink/?linkid=2108834 -OutFile AppInstaller.msixbundle;
         Add-AppxPackage -Path .\\AppInstaller.msixbundle;
 
-        # Install applications with winget
-        winget install --id exchange -e --silent;
-        winget install --id Splunk.UniversalForwarder -e --silent;
