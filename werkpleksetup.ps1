@@ -12,4 +12,4 @@ param (
 Set-TimeZone -Id "W. Europe Standard Time"  
 
 powershell -ExecutionPolicy bypass -File 7ZipSetup.ps1
-powershell -ExecutionPolicy bypass -File join-AD.ps1 -IpAddress $IpAddress -Username $Username -DomainName $DomainName -Password $Password
+powershell -ExecutionPolicy bypass -File joinAD2.ps1 -IpAddress $IpAddress -Username $Username -DomainName $DomainName -Password $Password
