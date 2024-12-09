@@ -1,5 +1,5 @@
 # ========================
-# 📁 Pad naar bestanden
+# 📁 Pad naar bestanden help
 # ========================
 $logFile = "C:\makeaduserlog.txt"
 $paramFilePath = "C:\ad-params.json"
