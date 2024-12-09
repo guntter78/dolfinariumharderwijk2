@@ -2,7 +2,7 @@ param (
   [Parameter(Mandatory=$false)]
   [string]$IpAddress,
   [Parameter(Mandatory=$false)]
-  [string]$Username,https://github.com/guntter78/dolfinariumharderwijk2/blob/main/werkpleksetup.ps1
+  [string]$Username,
   [Parameter(Mandatory=$true)]
   [string]$DomainName,
   [Parameter(Mandatory=$true)]
