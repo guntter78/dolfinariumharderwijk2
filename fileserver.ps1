@@ -2,7 +2,7 @@
 Install-WindowsFeature -Name FS-DFS-Namespace, FS-DFS-Replication, RSAT-DFS-Mgmt-Con -IncludeManagementTools
 
 # Variabelen definiëren
-$NamespacePath = "\\contoso.com\DFS"       # DFS Namespace
+$NamespacePath = "\\uvh.nl\DFS"       # DFS Namespace
 $TargetPaths = @("\\Server1\Share1", "\\Server2\Share2") # Namespace targets (update as needed)
 $ReplicationGroupName = "ReplicationGroup1" # Name of the replication group
 $PrimaryMember = "\\Server1\Share1"         # Primary member (optional, first server by default)
