@@ -83,6 +83,9 @@ try {
     New-ADGroup -Name "Administrators" -GroupScope Global -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
     Write-Log "Groep 'Administrators' succesvol aangemaakt of bestaat al."
 
+    New-ADGroup -Name "ICT Support" -GroupScope Global -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
+    Write-Log "Groep 'Administrators' succesvol aangemaakt of bestaat al."
+
     New-ADGroup -Name "Students" -GroupScope Global -Path "OU=Students,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
     Write-Log "Groep 'Students' succesvol aangemaakt of bestaat al."
 } catch {
@@ -112,7 +115,7 @@ try {
             New-ADUser -Name $user -AccountPassword $AdminPassword -Enabled $true -Path "OU=ICT Support,DC=uvh,DC=nl" -ErrorAction SilentlyContinue
             Write-Log "Admin gebruiker '$user' succesvol aangemaakt."
             
-            Add-ADGroupMember -Identity "Administrators" -Members $user -ErrorAction SilentlyContinue
+            Add-ADGroupMember -Identity "Administrators, ICT Support" -Members $user -ErrorAction SilentlyContinue
             Write-Log "Gebruiker '$user' succesvol toegevoegd aan de groep 'Administrators'."
         } catch {
             Write-Log "Fout bij het aanmaken van admin gebruiker '$user': $($_.Exception.Message)"
