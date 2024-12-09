@@ -1,3 +1,5 @@
+# .\Setup.EXE /Mode:Install /InstallWindowsComponents /IAcceptExchangeServerLicenseTerms_DiagnosticDataON /Roles:MB
+
 # Ensure the script is run as Administrator
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Error "Please run this script as an Administrator."
@@ -56,9 +58,13 @@ try {
 # Step 4: Run the Exchange Setup in Unattended Mode
 Write-Host "Starting Exchange Server installation..."
 try {
-    Start-Process -FilePath "$mountPoint$setupPath" -ArgumentList "/PrepareSchema /IAcceptExchangeServerLicenseTerms_DiagnosticDataON" -Wait -NoNewWindow
-    Start-Process -FilePath "$mountPoint$setupPath" -ArgumentList "/PrepareAD /IAcceptExchangeServerLicenseTerms_DiagnosticDataON" -Wait -NoNewWindow
-    Start-Process -FilePath "$mountPoint$setupPath" -ArgumentList "/mode:Install /roles:Mailbox,ClientAccess /IAcceptExchangeServerLicenseTerms_DiagnosticDataON" -Wait -NoNewWindow
+    # Prepare Schema and AD first
+    Start-Process -FilePath "$mountPoint$setupPath" -ArgumentList "/PrepareSchema /IAcceptExchangeServerLicenseTerms" -Wait -NoNewWindow
+    Start-Process -FilePath "$mountPoint$setupPath" -ArgumentList "/PrepareAD /IAcceptExchangeServerLicenseTerms" -Wait -NoNewWindow
+
+    # Run the unattended installation
+    $unattendedArgs = "/Mode:Install /InstallWindowsComponents /IAcceptExchangeServerLicenseTerms /Roles:MB"
+    Start-Process -FilePath "$mountPoint$setupPath" -ArgumentList $unattendedArgs -Wait -NoNewWindow
 } catch {
     Write-Error "Exchange installation failed: $_"
     exit
