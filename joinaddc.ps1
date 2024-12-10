@@ -1,4 +1,16 @@
-$logFile = "C:\makeaduserlog.txt"
+param (
+    [Parameter(Mandatory=$true)]
+    [string]$DomainName,
+    [Parameter(Mandatory=$true)]
+    [SecureString]$SafeModeAdministratorPassword,
+    [Parameter(Mandatory=$true)]
+    [string]$DomainAdminCredential,
+    [Parameter(Mandatory=$true)]
+    [string]$SiteName
+)
+
+$markerFile = "C:\ADConfig.marker"
+$dnsServerIp = "10.10.2.6"
 
 # ========================
 # 📝 Functie: Logging
@@ -11,8 +23,17 @@ function Write-Log {
 }
 
 # ========================
-# 🔄 Laad parameters uit JSON
+# 🌐 Configureer DNS-servers
 # ========================
+try {
+    Write-Log "Configureren van de DNS-server naar $dnsServerIp..."
+    $interfaces = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses -ne $null }
+    Set-DnsClientServerAddress -InterfaceAlias $interfaces.InterfaceAlias -ServerAddresses ($dnsServerIp)
+    Write-Log "DNS-serverconfiguratie voltooid. Ingesteld op $dnsServerIp."
+} catch {
+    Write-Log "Fout bij het configureren van de DNS-server: $($_.Exception.Message)"
+    exit 1
+}
 
 # ========================
 # 🏗️ Installeren en configureren van domeincontroller
