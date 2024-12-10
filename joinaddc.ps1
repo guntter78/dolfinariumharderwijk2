@@ -6,51 +6,66 @@ param (
     [string]$SiteName
 )
 
-# Log de ontvangen parameters
-Write-Host "Ontvangen parameters:"
-Write-Host "DomainName: $DomainName"
-Write-Host "SiteName: $SiteName"
-Write-Host "AdminUsername: $AdminUsername"
+# Start PowerShell-transcript (log de volledige uitvoer)
+Start-Transcript -Path "C:\install-ad-log.txt"
+
+# Log de ontvangen parameters (inclusief het wachtwoord)
+Write-Host "Ontvangen parameters:" | Out-File -FilePath "C:\install-ad-log.txt" -Append
+Write-Host "DomainName: $DomainName" | Out-File -FilePath "C:\install-ad-log.txt" -Append
+Write-Host "SiteName: $SiteName" | Out-File -FilePath "C:\install-ad-log.txt" -Append
+Write-Host "AdminUsername: $AdminUsername" | Out-File -FilePath "C:\install-ad-log.txt" -Append
+Write-Host "AdminPassword (plaintext): $AdminPassword" | Out-File -FilePath "C:\install-ad-log.txt" -Append
+Write-Host "SafeModeAdministratorPassword (plaintext): $SafeModeAdministratorPassword" | Out-File -FilePath "C:\install-ad-log.txt" -Append
 
 # Zet de wachtwoorden om naar SecureString
 $SecureDSRMPassword = ConvertTo-SecureString $SafeModeAdministratorPassword -AsPlainText -Force
 $SecureAdminPassword = ConvertTo-SecureString $AdminPassword -AsPlainText -Force
 
+# Controleer het type van de wachtwoordvariabelen
+Write-Host "Type van SecureDSRMPassword: $($SecureDSRMPassword.GetType().FullName)" | Out-File -FilePath "C:\install-ad-log.txt" -Append
+Write-Host "Type van SecureAdminPassword: $($SecureAdminPassword.GetType().FullName)" | Out-File -FilePath "C:\install-ad-log.txt" -Append
+
 # Maak een PSCredential object voor de Admin
 $Credential = New-Object System.Management.Automation.PSCredential ($AdminUsername, $SecureAdminPassword)
 
-# Configureer de DNS-server
-$dnsServerIp = "10.10.2.6"
-Write-Host "Configureren van de DNS-server naar $dnsServerIp..."
+# 🛠️ Stap 1: Voeg de server toe aan het domein
 try {
-    $interfaces = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses -ne $null }
-    Set-DnsClientServerAddress -InterfaceAlias $interfaces.InterfaceAlias -ServerAddresses ($dnsServerIp)
-    Write-Host "DNS-serverconfiguratie voltooid. Ingesteld op $dnsServerIp."
+    Write-Host "Server toevoegen aan het domein $DomainName met gebruiker $AdminUsername..." | Out-File -FilePath "C:\install-ad-log.txt" -Append
+    Add-Computer -DomainName $DomainName -Credential $Credential -Force
+    Write-Host "Server succesvol toegevoegd aan het domein $DomainName." | Out-File -FilePath "C:\install-ad-log.txt" -Append
 } catch {
-    Write-Host "Fout bij het configureren van de DNS-server: $_"
+    Write-Host "Fout bij het toevoegen aan het domein: $_" | Out-File -FilePath "C:\install-ad-log.txt" -Append
     exit 1
 }
 
-# Voeg de server toe als domeincontroller
-Write-Host "Active Directory configureren als domeincontroller..."
+# 🛠️ Stap 2: Herstart de server na domeinjoin
 try {
-    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools -ErrorAction Stop
-    Write-Host "AD-Domain-Services is succesvol geïnstalleerd."
+    Write-Host "Herstarten van de server na het toevoegen aan het domein..." | Out-File -FilePath "C:\install-ad-log.txt" -Append
+    Restart-Computer -Force
 } catch {
-    Write-Host "Fout bij het installeren van de AD DS-rol: $_"
+    Write-Host "Fout bij het herstarten van de server: $_" | Out-File -FilePath "C:\install-ad-log.txt" -Append
     exit 1
 }
 
+# 🛠️ Stap 3: Promoveer de server tot domeincontroller
 try {
-    Write-Host "Server toevoegen als domeincontroller aan het domein $DomainName met site $SiteName..."
+    Write-Host "Server toevoegen als domeincontroller aan het domein $DomainName met site $SiteName..." | Out-File -FilePath "C:\install-ad-log.txt" -Append
     Install-ADDSDomainController `
         -DomainName $DomainName `
         -SafeModeAdministratorPassword $SecureDSRMPassword `
         -Credential $Credential `
         -SiteName $SiteName `
         -Force
-    Write-Host "Server succesvol toegevoegd als domeincontroller aan het domein $DomainName."
+
+    Write-Host "Server succesvol toegevoegd als domeincontroller aan het domein $DomainName." | Out-File -FilePath "C:\install-ad-log.txt" -Append
+    
+    # Herstart de server na de installatie
+    Write-Host "Herstarten van de server om de promotie te voltooien..." | Out-File -FilePath "C:\install-ad-log.txt" -Append
+    Restart-Computer -Force
 } catch {
-    Write-Host "Fout bij het toevoegen van de server als domeincontroller: $_"
+    Write-Host "Fout bij het toevoegen als domeincontroller: $_" | Out-File -FilePath "C:\install-ad-log.txt" -Append
     exit 1
 }
+
+# Stop PowerShell-transcript
+Stop-Transcript
