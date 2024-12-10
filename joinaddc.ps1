@@ -1,16 +1,23 @@
 param (
     [Parameter(Mandatory=$true)]
     [string]$DomainName,
+    
     [Parameter(Mandatory=$true)]
     [SecureString]$SafeModeAdministratorPassword,
+    
     [Parameter(Mandatory=$true)]
-    [string]$DomainAdminCredential,
+    [string]$AdminUsername,
+    
+    [Parameter(Mandatory=$true)]
+    [SecureString]$AdminPassword,
+    
     [Parameter(Mandatory=$true)]
     [string]$SiteName
 )
 
 $markerFile = "C:\ADConfig.marker"
 $dnsServerIp = "10.10.2.6"
+$logFile = "C:\makeaduserlog.txt"
 
 # ========================
 # 📝 Functie: Logging
@@ -55,16 +62,20 @@ if (Test-Path $markerFile) {
     try {
         Write-Log "Stap 2: Toevoegen van de server als domeincontroller aan het bestaande domein..."
         
+        # Zet de referenties van de domeinbeheerder (AdminUsername en AdminPassword) om naar een PSCredential-object
+        $Credential = New-Object System.Management.Automation.PSCredential ($AdminUsername, $AdminPassword)
+        
         # Voeg de server toe als domeincontroller in een bestaand domein
         Install-ADDSDomainController `
             -DomainName $DomainName `
-            -SafeModeAdministratorPassword $SecurePassword `
-            -Credential $DomainAdminCredential `
+            -SafeModeAdministratorPassword $SafeModeAdministratorPassword `
+            -Credential $Credential `
             -SiteName $SiteName `
             -Force
 
         Write-Log "Server succesvol toegevoegd als domeincontroller aan het domein $DomainName."
         
+        # Maak een markerbestand aan zodat het script niet nogmaals wordt uitgevoerd
         New-Item -ItemType File -Path $markerFile
         Write-Log "Marker-bestand aangemaakt: $markerFile"
     } catch {
