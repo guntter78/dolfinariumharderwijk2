@@ -28,7 +28,7 @@ Write-Host "Downloading and installing prerequisites..."
 $ucmaUrl = "https://download.microsoft.com/download/2/C/4/2C47A5C1-A1F3-4843-B9FE-84C0032C61EC/UcmaRuntimeSetup.exe"
 $ucmaPath = "$env:TEMP\UcmaRuntimeSetup.exe"
 Download-File -url $ucmaUrl -outputPath $ucmaPath
-Start-Process -FilePath $ucmaPath -ArgumentList "/q" -Wait
+Start-Process -FilePath $ucmaPath -ArgumentList "/passive /norestart" -Wait
 
 # Visual C++ 2013 Redistributable Package
 $vcRedistUrl = "https://download.microsoft.com/download/2/E/6/2E61CFA4-993B-4DD4-91DA-3737CD5CD6E3/vcredist_x64.exe"
