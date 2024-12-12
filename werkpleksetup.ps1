@@ -28,4 +28,4 @@ $DomainUser = $Username + '@' + $DomainName
 $Cred = New-Object System.Management.Automation.PSCredential ($DomainUser, (ConvertTo-SecureString $Password -AsPlainText -Force))
 Add-Computer -DomainName $DomainName -Credential $Cred
 
-Restart-Computer -Force -Wait
+Restart-Computer -Force
