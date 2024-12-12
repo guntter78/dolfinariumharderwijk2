@@ -24,6 +24,22 @@ Set-DhcpServerv4OptionValue -ScopeId "10.0.128.0" -OptionId 3 -Value "10.0.128.1
 Add-DhcpServerv4Scope -Name "Int ISP" -StartRange "10.1.3.100" -EndRange "10.1.3.200" -SubnetMask "255.255.255.0"
 Set-DhcpServerv4OptionValue -ScopeId "10.1.3.0" -OptionId 3 -Value "10.1.3.1"
 
+# Configuratie voor VLAN20 (10.2.0.0/24 - Nunspeet)
+Add-DhcpServerv4Scope -Name "Nunspeet VLAN20" -StartRange "10.2.0.100" -EndRange "10.2.0.200" -SubnetMask "255.255.255.0"
+Set-DhcpServerv4OptionValue -ScopeId "10.2.0.0" -OptionId 3 -Value "10.2.0.1"
+
+# Configuratie voor VLAN21 (10.2.1.0/24 - Onderwijs)
+Add-DhcpServerv4Scope -Name "Onderwijs VLAN21" -StartRange "10.2.1.100" -EndRange "10.2.1.200" -SubnetMask "255.255.255.0"
+Set-DhcpServerv4OptionValue -ScopeId "10.2.1.0" -OptionId 3 -Value "10.2.1.1"
+
+# Configuratie voor VLAN30 (10.3.0.0/24 - Putten)
+Add-DhcpServerv4Scope -Name "Putten VLAN30" -StartRange "10.3.0.100" -EndRange "10.3.0.200" -SubnetMask "255.255.255.0"
+Set-DhcpServerv4OptionValue -ScopeId "10.3.0.0" -OptionId 3 -Value "10.3.0.1"
+
+# Configuratie voor VLAN31 (10.3.1.0/24 - Onderwijs)
+Add-DhcpServerv4Scope -Name "Onderwijs VLAN31" -StartRange "10.3.1.100" -EndRange "10.3.1.200" -SubnetMask "255.255.255.0"
+Set-DhcpServerv4OptionValue -ScopeId "10.3.1.0" -OptionId 3 -Value "10.3.1.1"
+
 # Herstarten van de DHCP-service
 Write-Host "Herstarten van DHCP-service..."
 Restart-Service DHCPServer
