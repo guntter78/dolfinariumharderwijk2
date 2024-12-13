@@ -1,0 +1,20 @@
+<Configuration ID="8edef7e6-abe4-47c4-b736-fdebdf65a513">
+  <Info Description="" />
+  <Add OfficeClientEdition="64" Channel="PerpetualVL2019" Version="16.0.10416.20027">
+    <Product ID="Standard2019Volume" PIDKEY="6NWWJ-YQWMR-QKGCB-6TMB3-9D9HK">
+      <Language ID="nl-nl" />
+      <ExcludeApp ID="Groove" />
+    </Product>
+  </Add>
+  <Property Name="SharedComputerLicensing" Value="0" />
+  <Property Name="FORCEAPPSHUTDOWN" Value="FALSE" />
+  <Property Name="DeviceBasedLicensing" Value="0" />
+  <Property Name="SCLCacheOverride" Value="0" />
+  <Property Name="AUTOACTIVATE" Value="1" />
+  <Updates Enabled="TRUE" />
+  <RemoveMSI />
+  <AppSettings>
+    <Setup Name="Company" Value="uvh" />
+  </AppSettings>
+  <Display Level="Full" AcceptEULA="TRUE" />
+</Configuration>
