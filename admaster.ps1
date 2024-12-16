@@ -140,3 +140,30 @@ try {
 
 Write-Log "Alle configuraties zijn succesvol voltooid."
 exit 0
+
+# ========================
+# 🔠 Configureer DFS
+# ========================
+try {
+    Write-Log "Stap 6: DFS configureren..."
+    Install-WindowsFeature -Name FS-DFS-Namespace, FS-DFS-Replication -IncludeManagementTools -ErrorAction Stop
+    Write-Log "DFS Namespace en DFS Replication succesvol geïnstalleerd."
+} catch {
+    Write-Log "Fout bij het configureren van DFS: $($_.Exception.Message)"
+    exit 1
+}
+
+# ========================
+# 🔧 Configureer File Server en File Server Resource Manager
+# ========================
+try {
+    Write-Log "Stap 7: File Server en File Server Resource Manager configureren..."
+    Install-WindowsFeature -Name FS-FileServer, FS-Resource-Manager -IncludeManagementTools -ErrorAction Stop
+    Write-Log "File Server en File Server Resource Manager succesvol geïnstalleerd."
+} catch {
+    Write-Log "Fout bij het configureren van de File Server en File Server Resource Manager: $($_.Exception.Message)"
+    exit 1
+}
+
+Write-Log "Alle configuraties zijn succesvol voltooid."
+exit 0
