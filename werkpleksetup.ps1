@@ -11,14 +11,6 @@ param (
 
 Set-TimeZone -Id "W. Europe Standard Time"  
 
-Invoke-WebRequest -Uri "https://github.com/guntter78/dolfinariumharderwijk2/raw/refs/heads/main/setup.exe" -OutFile "$env:TEMP\setup.exe"
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/guntter78/dolfinariumharderwijk2/refs/heads/main/Configuratie.xml" -OutFile "$env:TEMP\Configuratie.xml"
-
-cd $env:TEMP
-
-.\setup.exe /download .\Configuration.xml
-.\setup.exe /configure .\Configuration.xml
-
 
 
 $dlurl = 'https://7-zip.org/' + (Invoke-WebRequest -UseBasicParsing -Uri 'https://7-zip.org/' | Select-Object -ExpandProperty Links | Where-Object {($_.outerHTML -match 'Download')-and ($_.href -like "a/*") -and ($_.href -like "*-x64.exe")} | Select-Object -First 1 | Select-Object -ExpandProperty href)
