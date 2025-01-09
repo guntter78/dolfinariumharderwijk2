@@ -5,7 +5,7 @@
 # Parameters
 $ServerNames = @("vm-devops, vm-exchange, guacserver, vm-adserver")  # Voeg hier de namen van de servers toe
 $CriticalServices = @("wuauserv", "WinRM", "LanmanServer", "LanmanWorkstation")  # Essentiële services
-$AdditionalChecks = @("Windowsadserver", "devopsvm")  # Servers voor DFS, DHCP, DNS checks
+$AdditionalChecks = @("vm-adserver", "vm-devops")  # Servers voor DFS, DHCP, DNS checks
 
 Function Check-CPUUsage {
     param([string]$ServerName)
