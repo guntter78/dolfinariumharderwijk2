@@ -1,41 +1,51 @@
-### Windows Server Test Script
-# Dit script controleert de basisstatus van meerdere Windows Servers.
-# Controleert op CPU-gebruik, geheugen, schijfruimte, netwerkconnectiviteit en services.
-
-# Parameters
-$ServerNames = @("vm-devops, vm-exchange, guacserver, vm-adserver")  # Voeg hier de namen van de servers toe
-$CriticalServices = @("wuauserv", "WinRM", "LanmanServer", "LanmanWorkstation")  # Essentiële services
+# Correct definition of $ServerNames array
+$ServerNames = @("vm-devops", "vm-exchange", "vm-adserver")  # Voeg hier de namen van de servers toe
+$CriticalServices = @(
+    'wuauserv', 'winmgmt', 'rpcss', 'schedule', 'samss', 'LanmanServer',
+    'LanmanWorkstation', 'Dnscache', 'Dhcp', 'NlaSvc', 'Netlogon',
+    'MpsSvc', 'Spooler',  'w32time', 'NTDS'
+)
 $AdditionalChecks = @("vm-adserver", "vm-devops")  # Servers voor DFS, DHCP, DNS checks
 
-Function Check-CPUUsage {
+
+Function Get-CPUUsage {
     param([string]$ServerName)
-    Write-Host "\n--- Controleren van CPU-gebruik op $ServerName ---"
-    $cpu = Get-Counter -ComputerName $ServerName -Counter "\\Processor(_Total)\\% Processor Time" | Select-Object -ExpandProperty CounterSamples
-    $cpuUsage = [math]::round($cpu.CookedValue, 2)
-    Write-Host "CPU-gebruik: $cpuUsage%"
-    if ($cpuUsage -gt 85) {
-        Write-Warning "Hoge CPU-belasting gedetecteerd op $ServerName!"
-    } else {
-        Write-Host "CPU-belasting is normaal op $ServerName."
+    Write-Host "`n--- Controleren van CPU-gebruik op $ServerName ---"
+    try {
+        # Get CPU usage using Get-Counter
+        $cpu = Get-Counter -ComputerName $ServerName -Counter "\Processor(_Total)\% Processor Time" | Select-Object -ExpandProperty CounterSamples
+        $cpuUsage = [math]::round($cpu.CookedValue, 2)
+        Write-Host "CPU-gebruik: $cpuUsage%"
+        if ($cpuUsage -gt 85) {
+            Write-Warning "Hoge CPU-belasting gedetecteerd op $ServerName!"
+        } else {
+            Write-Host "CPU-belasting is normaal op $ServerName."
+        }
+    } catch {
+        Write-Warning "Kon geen CPU-gegevens ophalen van $ServerName. Controleer of de server bereikbaar is."
     }
 }
-Function Check-MemoryUsage {
+Function Get-MemoryUsage {
     param([string]$ServerName)
     Write-Host "\n--- Controleren van geheugengebruik op $ServerName ---"
-    $memory = Get-CimInstance -ComputerName $ServerName -ClassName Win32_OperatingSystem
-    $totalMemory = [math]::round($memory.TotalVisibleMemorySize / 1MB, 2)
-    $freeMemory = [math]::round($memory.FreePhysicalMemory / 1MB, 2)
-    $usedMemory = $totalMemory - $freeMemory
-    $usedPercentage = [math]::round(($usedMemory / $totalMemory) * 100, 2)
-    Write-Host "Totale geheugen: $totalMemory MB"
-    Write-Host "Gebruikt geheugen: $usedMemory MB ($usedPercentage%)"
-    if ($usedPercentage -gt 85) {
-        Write-Warning "Hoge geheugengebruik gedetecteerd op $ServerName!"
-    } else {
-        Write-Host "Geheugenverbruik is binnen het normale bereik op $ServerName."
+    try {
+        $memory = Get-CimInstance -ComputerName $ServerName -ClassName Win32_OperatingSystem
+        $totalMemory = [math]::round($memory.TotalVisibleMemorySize / 1MB, 2)
+        $freeMemory = [math]::round($memory.FreePhysicalMemory / 1MB, 2)
+        $usedMemory = $totalMemory - $freeMemory
+        $usedPercentage = [math]::round(($usedMemory / $totalMemory) * 100, 2)
+        Write-Host "Totale geheugen: $totalMemory MB"
+        Write-Host "Gebruikt geheugen: $usedMemory MB ($usedPercentage%)"
+        if ($usedPercentage -gt 85) {
+            Write-Warning "Hoge geheugengebruik gedetecteerd op $ServerName!"
+        } else {
+            Write-Host "Geheugenverbruik is binnen het normale bereik op $ServerName."
+        }
+    } catch {
+        Write-Warning "Kon geen geheugengegevens ophalen van $ServerName. Controleer of de server bereikbaar is."
     }
 }
-Function Check-DiskSpace {
+Function Get-DiskSpace {
     param([string]$ServerName)
     Write-Host "\n--- Controleren van schijfruimte op $ServerName ---"
     $disks = Get-WmiObject -ComputerName $ServerName -Class Win32_LogicalDisk -Filter "DriveType=3"
@@ -51,10 +61,10 @@ Function Check-DiskSpace {
         }
     }
 }
-Function Check-NetworkConnectivity {
+Function Get-NetworkConnectivity {
     param([string]$ServerName)
     Write-Host "\n--- Controleren van netwerkconnectiviteit vanaf $ServerName ---"
-    $testURL = "www.google.com"
+    $testURL = "uvh.nl"
     try {
         Test-Connection -ComputerName $testURL -Count 2 -ErrorAction Stop
         Write-Host "Netwerkconnectiviteit vanaf $ServerName naar $testURL is OK."
@@ -62,7 +72,7 @@ Function Check-NetworkConnectivity {
         Write-Warning "Kan geen verbinding maken met $testURL vanaf $ServerName. Controleer de netwerkverbinding."
     }
 }
-Function Check-CriticalServices {
+Function Get-CriticalServices {
     param([string]$ServerName)
     Write-Host "\n--- Controleren van essentiële services op $ServerName ---"
     foreach ($service in $CriticalServices) {
@@ -74,25 +84,15 @@ Function Check-CriticalServices {
         }
     }
 }
-Function Check-AdditionalServices {
-    param([string]$ServerName)
-    Write-Host "\n--- Controleren van aanvullende services (DFS, DHCP, DNS) op $ServerName ---"
-    $additionalServices = @("DFS", "DHCPServer", "DNS")
-    foreach ($service in $additionalServices) {
-        $serviceStatus = Get-Service -ComputerName $ServerName -Name $service -ErrorAction SilentlyContinue
-        if ($serviceStatus.Status -eq 'Running') {
-            Write-Host "Service $service is actief op $ServerName."
-        } else {
-            Write-Warning "Service $service is NIET actief op $ServerName!"
-        }
-    }
-}
-Function Check-EventLogs {
+Function Get-EventLogs {
     param([string]$ServerName)
     Write-Host "`n--- Controleren van Event Logs op $ServerName ---"
     try {
+        # Haal de systeemlogboeken op en filter op kritieke fouten
         $logs = Get-WinEvent -ComputerName $ServerName -FilterHashtable @{LogName='System'; Level=1; StartTime=(Get-Date).AddDays(-1)} -ErrorAction Stop
-        if ($logs) {
+
+        # Als er logs zijn, geef ze weer, anders toon een bericht dat er geen kritieke fouten zijn
+        if ($logs.Count -gt 0) {
             Write-Warning "Er zijn kritieke fouten gevonden in de Event Logs van $ServerName!"
             $logs | Select-Object -First 5 | ForEach-Object {
                 Write-Host "Tijd: $($_.TimeCreated) - Bron: $($_.ProviderName) - Bericht: $($_.Message)"
@@ -101,10 +101,10 @@ Function Check-EventLogs {
             Write-Host "Geen kritieke fouten gevonden in de Event Logs van $ServerName."
         }
     } catch {
-        Write-Warning "Kan de Event Logs niet ophalen van $ServerName. Controleer of de server bereikbaar is."
+        Write-Host "Geen kritieke fouten gevonden in de Event Logs van $ServerName."
     }
 }
-Function Check-PendingUpdates {
+Function Get-PendingUpdates {
     param([string]$ServerName)
     Write-Host "`n--- Controleren van openstaande Windows-updates op $ServerName ---"
     try {
@@ -121,27 +121,50 @@ Function Check-PendingUpdates {
         Write-Warning "Kan updates niet controleren op $ServerName. Controleer of de server bereikbaar is."
     }
 }
-Function Check-UserSessions {
+Function Get-AdditionalServices {
+    param([string]$ServerName)
+    Write-Host "\n--- Controleren van aanvullende services (DFS, DHCP, DNS) op $ServerName ---"
+    $additionalServices = @("DFS", "DHCPServer", "DNS")
+    foreach ($service in $additionalServices) {
+        $serviceStatus = Get-Service -ComputerName $ServerName -Name $service -ErrorAction SilentlyContinue
+        if ($serviceStatus.Status -eq 'Running') {
+            Write-Host "Service $service is actief op $ServerName."
+        } else {
+            Write-Warning "Service $service is NIET actief op $ServerName!"
+        }
+    }
+}
+Function Get-UserSessions {
     param([string]$ServerName)
     Write-Host "`n--- Controleren van actieve gebruikerssessies op $ServerName ---"
     try {
+        # Haal actieve logon-sessies op
         $sessions = Get-CimInstance -ClassName Win32_LogonSession -ComputerName $ServerName | Where-Object {$_.LogonType -eq 2}
         if ($sessions) {
             Write-Host "Actieve gebruikerssessies gevonden op $ServerName :"
-            $sessions | ForEach-Object {
-                Write-Host "Logon ID: $($_.LogonId) - Logon Time: $($_.StartTime)"
+            foreach ($session in $sessions) { 
+                # Koppel de sessie aan de gebruiker
+                $loggedOnUsers = Get-CimInstance -ClassName Win32_LoggedOnUser -ComputerName $ServerName | Where-Object { $_.Dependent -match $session.LogonId }
+                foreach ($loggedOnUser in $loggedOnUsers) {
+                    $userPath = ($loggedOnUser.Antecedent -split '"')[1]
+                    $user = Get-CimInstance -Query "SELECT * FROM Win32_Account WHERE __RELPATH LIKE '%$userPath%' AND SIDType=1" -ComputerName $ServerName
+                    if ($user) {
+                        Write-Host "Gebruiker: $($user.Name) - Domein: $($user.Domain) - Logon Time: $($session.StartTime)"
+                    }
+                }
             }
         } else {
             Write-Host "Geen actieve gebruikerssessies gevonden op $ServerName."
         }
     } catch {
-        Write-Warning "Kan gebruikerssessies niet ophalen op $ServerName."
+        Write-Warning "Kan gebruikerssessies niet ophalen op $ServerName. Fout: $_"
     }
 }
-Function Check-PortStatus {
+Function Get-PortStatus {
     param(
         [string]$ServerName,
-        [int[]]$Ports = @(80, 443, 3389)
+        [int[]]$Ports = @(22, 80, 443, 3389, 8080, 8443, 3306, 5432, 6379, 9090)
+
     )
     Write-Host "`n--- Controleren van poortstatus op $ServerName ---"
     foreach ($port in $Ports) {
@@ -150,14 +173,14 @@ Function Check-PortStatus {
             if ($connection.TcpTestSucceeded) {
                 Write-Host "Poort $port is open op $ServerName."
             } else {
-                Write-Warning "Poort $port is niet bereikbaar op $ServerName!"
+                Write-Host "Poort $port is niet bereikbaar op $ServerName!"
             }
         } catch {
             Write-Warning "Kan poort $port niet controleren op $ServerName."
         }
     }
 }
-Function Check-Uptime {
+Function Get-Uptime {
     param([string]$ServerName)
     Write-Host "`n--- Controleren van uptime op $ServerName ---"
     try {
@@ -169,25 +192,26 @@ Function Check-Uptime {
         Write-Warning "Kan uptime niet controleren op $ServerName."
     }
 }
-Function Display-Summary {
+Function Show-Summary {
     foreach ($ServerName in $ServerNames) {
-        Write-Host "\n--- Samenvatting van de serverstatus voor $ServerName ---"
-        Check-CPUUsage -ServerName $ServerName
-        Check-MemoryUsage -ServerName $ServerName
-        Check-DiskSpace -ServerName $ServerName
-        Check-NetworkConnectivity -ServerName $ServerName
-        Check-CriticalServices -ServerName $ServerName
-        Check-EventLogs -ServerName $ServerName
-        Check-PendingUpdates -ServerName $ServerName
-        Check-UserSessions -ServerName $ServerName
-        Check-PortStatus -ServerName $ServerName -Ports @(80, 443, 3389)
-        Check-Uptime -ServerName $ServerName
+        Write-Host "`n--- Samenvatting van de serverstatus voor $ServerName ---"
+        Get-CPUUsage -ServerName $ServerName
+        Get-MemoryUsage -ServerName $ServerName
+        Get-DiskSpace -ServerName $ServerName
+        Get-NetworkConnectivity -ServerName $ServerName
+        Get-CriticalServices -ServerName $ServerName
+        Get-EventLogs -ServerName $ServerName
+        Get-PendingUpdates -ServerName $ServerName
+        Get-UserSessions -ServerName $ServerName
+        Get-PortStatus -ServerName $ServerName
+        Get-Uptime -ServerName $ServerName
         if ($ServerName -in $AdditionalChecks) {
-            Check-AdditionalServices -ServerName $ServerName
+            Get-AdditionalServices -ServerName $ServerName
         }
-        Write-Host "\n--- Servercontrole voltooid voor $ServerName ---"
+
+        Write-Host "`n--- Controles voltooid voor $ServerName ---"
     }
 }
 
-# Uitvoeren van de controles
-Display-Summary
+# Execute the summary
+Show-Summary

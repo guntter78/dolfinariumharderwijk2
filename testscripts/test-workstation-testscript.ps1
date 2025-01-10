@@ -5,6 +5,8 @@ $CriticalServices = @(
     'LanmanWorkstation', 'Dnscache', 'Dhcp', 'NlaSvc', 'Netlogon',
     'MpsSvc', 'Spooler',  'w32time', 'NTDS'
 )
+$AdditionalChecks = @("vm-adserver", "vm-devops")  # Servers voor DFS, DHCP, DNS checks
+
 
 Function Get-CPUUsage {
     param([string]$ServerName)
@@ -82,14 +84,131 @@ Function Get-CriticalServices {
         }
     }
 }
+Function Get-EventLogs {
+    param([string]$ServerName)
+    Write-Host "`n--- Controleren van Event Logs op $ServerName ---"
+    try {
+        # Haal de systeemlogboeken op en filter op kritieke fouten
+        $logs = Get-WinEvent -ComputerName $ServerName -FilterHashtable @{LogName='System'; Level=1; StartTime=(Get-Date).AddDays(-1)} -ErrorAction Stop
+
+        # Als er logs zijn, geef ze weer, anders toon een bericht dat er geen kritieke fouten zijn
+        if ($logs.Count -gt 0) {
+            Write-Warning "Er zijn kritieke fouten gevonden in de Event Logs van $ServerName!"
+            $logs | Select-Object -First 5 | ForEach-Object {
+                Write-Host "Tijd: $($_.TimeCreated) - Bron: $($_.ProviderName) - Bericht: $($_.Message)"
+            }
+        } else {
+            Write-Host "Geen kritieke fouten gevonden in de Event Logs van $ServerName."
+        }
+    } catch {
+        Write-Host "Geen kritieke fouten gevonden in de Event Logs van $ServerName."
+    }
+}
+Function Get-PendingUpdates {
+    param([string]$ServerName)
+    Write-Host "`n--- Controleren van openstaande Windows-updates op $ServerName ---"
+    try {
+        $updates = Invoke-Command -ComputerName $ServerName -ScriptBlock {
+            Get-WindowsUpdate -AcceptAll -IgnoreReboot -ErrorAction SilentlyContinue
+        }
+        if ($updates) {
+            Write-Warning "Er zijn openstaande updates op $ServerName!"
+            $updates | ForEach-Object { Write-Host "Update: $($_.Title)" }
+        } else {
+            Write-Host "Geen openstaande updates gevonden op $ServerName."
+        }
+    } catch {
+        Write-Warning "Kan updates niet controleren op $ServerName. Controleer of de server bereikbaar is."
+    }
+}
+Function Get-AdditionalServices {
+    param([string]$ServerName)
+    Write-Host "\n--- Controleren van aanvullende services (DFS, DHCP, DNS) op $ServerName ---"
+    $additionalServices = @("DFS", "DHCPServer", "DNS")
+    foreach ($service in $additionalServices) {
+        $serviceStatus = Get-Service -ComputerName $ServerName -Name $service -ErrorAction SilentlyContinue
+        if ($serviceStatus.Status -eq 'Running') {
+            Write-Host "Service $service is actief op $ServerName."
+        } else {
+            Write-Warning "Service $service is NIET actief op $ServerName!"
+        }
+    }
+}
+Function Get-UserSessions {
+    param([string]$ServerName)
+    Write-Host "`n--- Controleren van actieve gebruikerssessies op $ServerName ---"
+    try {
+        # Haal actieve logon-sessies op
+        $sessions = Get-CimInstance -ClassName Win32_LogonSession -ComputerName $ServerName | Where-Object {$_.LogonType -eq 2}
+        if ($sessions) {
+            Write-Host "Actieve gebruikerssessies gevonden op $ServerName :"
+            foreach ($session in $sessions) { 
+                # Koppel de sessie aan de gebruiker
+                $loggedOnUsers = Get-CimInstance -ClassName Win32_LoggedOnUser -ComputerName $ServerName | Where-Object { $_.Dependent -match $session.LogonId }
+                foreach ($loggedOnUser in $loggedOnUsers) {
+                    $userPath = ($loggedOnUser.Antecedent -split '"')[1]
+                    $user = Get-CimInstance -Query "SELECT * FROM Win32_Account WHERE __RELPATH LIKE '%$userPath%' AND SIDType=1" -ComputerName $ServerName
+                    if ($user) {
+                        Write-Host "Gebruiker: $($user.Name) - Domein: $($user.Domain) - Logon Time: $($session.StartTime)"
+                    }
+                }
+            }
+        } else {
+            Write-Host "Geen actieve gebruikerssessies gevonden op $ServerName."
+        }
+    } catch {
+        Write-Warning "Kan gebruikerssessies niet ophalen op $ServerName. Fout: $_"
+    }
+}
+Function Get-PortStatus {
+    param(
+        [string]$ServerName,
+        [int[]]$Ports = @(22, 80, 443, 3389, 8080, 8443, 3306, 5432, 6379, 9090)
+
+    )
+    Write-Host "`n--- Controleren van poortstatus op $ServerName ---"
+    foreach ($port in $Ports) {
+        try {
+            $connection = Test-NetConnection -ComputerName $ServerName -Port $port -WarningAction SilentlyContinue
+            if ($connection.TcpTestSucceeded) {
+                Write-Host "Poort $port is open op $ServerName."
+            } else {
+                Write-Host "Poort $port is niet bereikbaar op $ServerName!"
+            }
+        } catch {
+            Write-Warning "Kan poort $port niet controleren op $ServerName."
+        }
+    }
+}
+Function Get-Uptime {
+    param([string]$ServerName)
+    Write-Host "`n--- Controleren van uptime op $ServerName ---"
+    try {
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ComputerName $ServerName
+        $lastBootTime = $os.LastBootUpTime
+        $uptime = (Get-Date) - $lastBootTime
+        Write-Host "Server $ServerName is actief sinds: $lastBootTime (Uptime: $([math]::Round($uptime.TotalHours, 2)) uur)"
+    } catch {
+        Write-Warning "Kan uptime niet controleren op $ServerName."
+    }
+}
 Function Show-Summary {
     foreach ($ServerName in $ServerNames) {
         Write-Host "`n--- Samenvatting van de serverstatus voor $ServerName ---"
-        Get-CPUUsage -ServerName $ServerName
-        Get-MemoryUsage -ServerName $ServerName
-        Get-DiskSpace -ServerName $ServerName
-        Get-NetworkConnectivity -ServerName $ServerName
-        Get-CriticalServices -ServerName $ServerName
+        # Get-CPUUsage -ServerName $ServerName
+        # Get-MemoryUsage -ServerName $ServerName
+        # Get-DiskSpace -ServerName $ServerName
+        # Get-NetworkConnectivity -ServerName $ServerName
+        # Get-CriticalServices -ServerName $ServerName
+    #    Get-EventLogs -ServerName $ServerName
+        # Get-PendingUpdates -ServerName $ServerName
+        # Get-UserSessions -ServerName $ServerName
+        # Get-PortStatus -ServerName $ServerName
+        Get-Uptime -ServerName $ServerName
+        # if ($ServerName -in $AdditionalChecks) {
+        #     Get-AdditionalServices -ServerName $ServerName
+        # }
+
         Write-Host "`n--- Controles voltooid voor $ServerName ---"
     }
 }
