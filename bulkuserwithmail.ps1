@@ -7,9 +7,22 @@ $mailDatabase = "Mailbox Database 1000089917"
 # ========================
 # 📁 Controleer benodigde modules
 # ========================
+# Controleer of ImportExcel module aanwezig is
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
     Write-Host "De Import-Excel module is niet geïnstalleerd. Installeren..." -ForegroundColor Yellow
     Install-Module -Name ImportExcel -Force -Scope CurrentUser
+}
+
+# Controleer of Exchange Management Shell module aanwezig is
+if (-not (Get-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue)) {
+    Write-Host "De Exchange Management Shell module is niet geladen. Laden..." -ForegroundColor Yellow
+    Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn
+}
+
+# Controleer of Enable-Mailbox cmdlet beschikbaar is
+if (-not (Get-Command Enable-Mailbox -ErrorAction SilentlyContinue)) {
+    Write-Host "De cmdlet 'Enable-Mailbox' is niet beschikbaar. Controleer of je het script uitvoert in de Exchange Management Shell." -ForegroundColor Red
+    exit
 }
 
 # ========================
