@@ -15,25 +15,13 @@ Start-Process -FilePath $installerPath -Args "/S" -Verb RunAs -Wait
 Remove-Item $installerPath
 
 # Replace the parameters with your own values
-param (
-  [Parameter(Mandatory=$false)]
-  [string]$IpAddress = "10.10.2.6",  # Default value for IP Address
-  [Parameter(Mandatory=$false)]
-  [string]$Username = "harderwijk-admin",  # Default value for Username
-  [Parameter(Mandatory=$false)]
-  [string]$DomainName = "uvh.nl",  # Default value for Domain Name
-  [Parameter(Mandatory=$false)]
-  [string]$Password = "Dolfinarium1!"  # Default value for Password
-)
-
-# Replace the parameters with your own values
-
 $interfaces = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses -ne $null }
 Set-DnsClientServerAddress -InterfaceAlias $interfaces.InterfaceAlias -ServerAddresses ($IpAddress,"10.10.2.6")
 
-$DomainUser = $Username + '@' + $DomainName
+$DomainUser = "harderwijk-admin" + '@' + "uvh.nl"
 
-$Cred = New-Object System.Management.Automation.PSCredential ($DomainUser, (ConvertTo-SecureString $Password -AsPlainText -Force))
-Add-Computer -DomainName $DomainName -Credential $Cred
+$Cred = New-Object System.Management.Automation.PSCredential ("harderwijk-admin", (ConvertTo-SecureString "Dolfinarium1!" -AsPlainText -Force))
+Add-Computer -DomainName "uvh.nl" -Credential $Cred
 
-Restart-Computer -Force -Wait
+Restart-Computer -Force 
+
