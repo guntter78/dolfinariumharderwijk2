@@ -41,6 +41,14 @@ Set-DhcpServerv4OptionValue -ScopeId "10.3.0.0" -OptionId 3 -Value "10.3.0.1"
 Add-DhcpServerv4Scope -Name "Onderwijs VLAN31" -StartRange "10.3.1.100" -EndRange "10.3.1.200" -SubnetMask "255.255.255.0"
 Set-DhcpServerv4OptionValue -ScopeId "10.3.1.0" -OptionId 3 -Value "10.3.1.1"
 
+# Toevoegen van DNS-servers aan alle scopes
+$dnsServers = "10.24.102.106", "10.10.2.11", "10.10.2.6"
+$scopes = Get-DhcpServerv4Scope
+foreach ($scope in $scopes) {
+    Set-DhcpServerv4OptionValue -ScopeId $scope.ScopeId -OptionId 6 -Value $dnsServers
+    Write-Host "DNS servers added to scope: $($scope.ScopeId)"
+}
+
 # Herstarten van de DHCP-service
 Write-Host "Herstarten van DHCP-service..."
 Restart-Service DHCPServer
